@@ -718,7 +718,7 @@ perm_test_pval_IA <- function(dataset1, dataset2, crit_val = 0, drop_trt = 0, st
   return(list(pvalue = pvalue, nulls = nulls, total_attempts = attempts))
 }
 
-## Scenario 1 (external event) and exclusion of patients - first simulation:
+## Scenario EXT-DROP - first simulation:
 ## one (fixed) experimental treatment is dropped due to an external event.
 ## Arguments:
 ## * 'N' is the total number of planned patients;
@@ -887,7 +887,7 @@ simulate_one1 <- function(N = 200, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_l
   
 }
 
-## Scenario 1 (external event) and orientation of patients - first simulation:
+## Scenario EXT-ORIENT - first simulation:
 ## one (fixed) experimental treatment is dropped due to an external event.
 ## Arguments:
 ## * 'N' is the total number of planned patients;
@@ -1209,7 +1209,7 @@ simulate_one2 <- function(N = 200, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_l
   
 }
 
-## Scenario 2 (interim analysis) and exclusion of patients - first simulation:
+## Scenario IA-DROP - first simulation:
 ## the least effective experimental treatment is droppedafter an interim futility analysis.
 ## Arguments:
 ## * 'N' is the total number of planned patients;
@@ -1481,7 +1481,7 @@ simulate_one3 <- function(N = 200, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_l
   
 }
 
-## Scenario 2 (interim analysis) and orientation of patients - first simulation:
+## Scenario IA-ORIENT - first simulation:
 ## the least effective experimental treatment is droppedafter an interim futility analysis.
 ## Arguments:
 ## * 'N' is the total number of planned patients;
@@ -1955,7 +1955,7 @@ future::availableCores() # check the number of available cores
 plan(multisession, workers = future::availableCores() - 2)
 
 ## Running simulation studies
-# Scenario 1 and exclusion of patients
+# Scenario EXT-DROP
 Ntrials <- 10000
 rslt1 <- furrr::future_map(1:Ntrials, ~{
   simulate_one1(N = 200, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_labels = c(1,2), 
@@ -1965,7 +1965,7 @@ rslt1 <- furrr::future_map(1:Ntrials, ~{
   }, .progress = TRUE, .options = furrr_options(seed = 1234))
 rslt1_df <- list_rbind(rslt1)
 
-# Scenario 1 and orientation of patients
+# Scenario EXT-ORIENT
 rslt2 <- furrr::future_map(1:Ntrials, ~{
   simulate_one2(N = 200, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_labels = c(1,2), 
                 probs = c(0.5,0.5), bs = 4, alpha = 1, sigma = c(0.5,0.5,0.5,0.5),
@@ -1982,7 +1982,7 @@ rslt2 <- furrr::future_map(1:Ntrials, ~{
   }, .progress = TRUE, .options = furrr_options(seed = 1234))
 rslt2_df <- list_rbind(rslt2)
 
-# Scenario 2 and exclusion of patients
+# Scenario IA-DROP
 rslt3 <- furrr::future_map(1:Ntrials, ~{
   simulate_one3(N = 200, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_labels = c(1,2), 
                 probs = c(0.5,0.5), bs = 4, alpha = 1,  sigma = c(0.5,0.5,0.5,0.5), 
@@ -1992,7 +1992,7 @@ rslt3 <- furrr::future_map(1:Ntrials, ~{
   }, .progress = TRUE, .options = furrr_options(seed = 1234))
 rslt3_df <- list_rbind(rslt3)
 
-# Scenario 2 and orientation of patients
+# Scenario IA-ORIENT
 rslt4 <- furrr::future_map(1:Ntrials, ~{
   simulate_one4(N = 200, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_labels = c(1,2), 
                probs = c(0.5,0.5), bs = 4, alpha = 1, sigma = c(0.5,0.5,0.5,0.5),
@@ -2008,6 +2008,7 @@ rslt4 <- furrr::future_map(1:Ntrials, ~{
     mutate(sim=.x)
   }, .progress = TRUE, .options = furrr_options(seed = 1234))
 rslt4_df <- list_rbind(rslt4)
+
 
 
 
