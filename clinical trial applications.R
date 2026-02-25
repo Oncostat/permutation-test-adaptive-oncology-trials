@@ -1,6 +1,7 @@
-## This R code allows to replicate the two simulation studies presented in the paper 
+## This R code allows to replicate the two clinical trial applications presented in the paper 
 ## "Using permutation-based tests to evaluate an adaptive molecular treatment
-##  algorithm in randomized precision oncology trials" by Marelli et al.
+## algorithm in randomized precision oncology trials" by Marelli et al.
+## Before running the code, please download the synthetic datasets syn_BREAST.xlsx and syn_LUNG.xlsx.
 
 ## Install and upload packages and functions
 
@@ -253,7 +254,7 @@ simulate_one_rand_IA <- function(data, target, cov_list, crit_val=0, L=15000,
 ################################################################################
 
 
-## Load the synthetic dataset generated from the SAFIR02-BREAST/PI3K dataset.
+## Load the synthetic dataset generated from the SAFIR02-BREAST/PI3K dataset (syn_BREAST.xlsx).
 ## It includes the following variables:
 ## * "targeted_therapy": therapy tailored to the characteristics of the patient;
 ## * "armAB": treatment arm ('A' or 'B');
@@ -265,7 +266,7 @@ simulate_one_rand_IA <- function(data, target, cov_list, crit_val=0, L=15000,
 ## * "PFS": follow-up;              
 ## * "PFS_event": event (1=event, 0=censored).      
 
-syn_BREAST <- read_excel("C:/Users/C_MARELLI/OneDrive - gustaveroussy.fr/PhD PROJECT/papers/axis 1/github code/syn_BREAST.xlsx")
+syn_BREAST <- read_excel("syn_BREAST.xlsx")
 head(syn_BREAST)
 nrow(syn_BREAST)
 
@@ -422,7 +423,7 @@ print(paste("Permutation p-value: ",pvalue_rand_strat_BREAST))
 ################################################################################
 
 
-## Load the synthetic dataset generated from the SAFIR02-LUNG dataset.
+## Load the synthetic dataset generated from the SAFIR02-LUNG dataset (syn_LUNG.xlsx).
 ## It includes the following variables:
 ## * "TARGET": name of the biomarker;
 ## * "treatment": therapy tailored to the characteristics of the patient;
@@ -435,7 +436,7 @@ print(paste("Permutation p-value: ",pvalue_rand_strat_BREAST))
 ## * "PFS": follow-up;              
 ## * "PFS_event": event (1=event, 0=censored).   
 
-syn_LUNG <- read_excel("C:/Users/C_MARELLI/OneDrive - gustaveroussy.fr/PhD PROJECT/papers/axis 1/github code/syn_LUNG.xlsx")
+syn_LUNG <- read_excel("syn_LUNG.xlsx")
 head(syn_LUNG)
 nrow(syn_LUNG)
 
@@ -563,6 +564,7 @@ pvalue_rand_strat_LUNG <- (1/rslt3_df$total_attempts[1])*
   sum(ifelse(abs(rslt3_df$S_rand_strat) >= abs(S_obs_strat_LUNG),1,0))
 print(paste("Permutation p-value: ",pvalue_rand_strat_LUNG))
 print(paste("Total number of attemps: ",rslt3_df$total_attempts[1]))
+
 
 
 
