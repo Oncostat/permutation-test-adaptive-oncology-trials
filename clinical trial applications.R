@@ -246,7 +246,7 @@ simulate_one_rand_IA <- function(data, target, cov_list, crit_val=0, L=15000,
     }
   }
   
-  tibble::tibble(S_rand_strat=S_rand_s,total_attempts = attempts[1])
+  tibble::tibble(S_rand_strat=S_rand_s,total_attempts = attempts)
 }
 
 
@@ -559,10 +559,11 @@ rslt3 <- furrr::future_map(1:1, ~{
 rslt3_df <- list_rbind(rslt3)
 
 print(paste("Observed p-value: ",pvalue_obs_strat_LUNG))
-pvalue_rand_strat_LUNG <- (1/rslt3_df$total_attempts)*
+pvalue_rand_strat_LUNG <- (1/rslt3_df$total_attempts[1])*
   sum(ifelse(abs(rslt3_df$S_rand_strat) >= abs(S_obs_strat_LUNG),1,0))
 print(paste("Permutation p-value: ",pvalue_rand_strat_LUNG))
-print(paste("Total number of attemps: ",rslt3_df$total_attempts))
+print(paste("Total number of attemps: ",rslt3_df$total_attempts[1]))
+
 
 
 
