@@ -254,7 +254,7 @@ simulate_one_rand_IA <- function(data, target, cov_list, crit_val=0, L=15000,
 ################################################################################
 
 
-## Load the synthetic dataset generated from the SAFIR02-BREAST/PI3K dataset (syn_BREAST.xlsx).
+## Load the synthetic dataset generated from the SAFIR02-BREAST dataset (syn_BREAST.xlsx).
 ## It includes the following variables:
 ## * "targeted_therapy": therapy tailored to the characteristics of the patient;
 ## * "armAB": treatment arm ('A' or 'B');
