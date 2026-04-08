@@ -1962,7 +1962,7 @@ rslt1 <- furrr::future_map(1:Ntrials, ~{
                 probs = c(0.5,0.5), bs = 4, alpha = 1, sigma = c(0.5,0.5,0.5,0.5), tau_H0 = c(0,0,0,0),
                 tau_H1 = c(0.40,0.40,0.40,0.40), drop_trt = 4, perms = 1000) %>%
     mutate(sim=.x)
-  }, .progress = TRUE, .options = furrr_options(seed = 1234))
+  }, .progress = TRUE, .options = furrr_options(seed = 234))
 rslt1_df <- list_rbind(rslt1)
 
 # Scenario EXT-ORIENT
@@ -1979,7 +1979,7 @@ rslt2 <- furrr::future_map(1:Ntrials, ~{
                                  0.40,0.40,0.40,0.40), nrow = 4, ncol = 4, byrow = TRUE), 
                 drop_trt = 4, probs_orient = c(1/3,1/3,1/3),  perms = 1000) %>%
     mutate(sim=.x)
-  }, .progress = TRUE, .options = furrr_options(seed = 1234))
+  }, .progress = TRUE, .options = furrr_options(seed = 234))
 rslt2_df <- list_rbind(rslt2)
 
 # Scenario IA-DROP
@@ -1989,7 +1989,7 @@ rslt3 <- furrr::future_map(1:Ntrials, ~{
                 tau_H0 = c(0,0,0,0), tau_H1 = c(0.40,0.40,0.40,-0.40), z_c = 0,
                 perms = 1000, max_atts = 100000) %>%
     mutate(sim=.x)
-  }, .progress = TRUE, .options = furrr_options(seed = 1234))
+  }, .progress = TRUE, .options = furrr_options(seed = 234))
 rslt3_df <- list_rbind(rslt3)
 
 # Scenario IA-ORIENT
@@ -2006,7 +2006,7 @@ rslt4 <- furrr::future_map(1:Ntrials, ~{
                                  0.40,0.40,0.40,-0.40), nrow = 4, ncol = 4, byrow = TRUE), 
                z_c = 0, probs_orient = c(1/3,1/3,1/3), perms = 1000, max_atts = 100000) %>%
     mutate(sim=.x)
-  }, .progress = TRUE, .options = furrr_options(seed = 1234))
+  }, .progress = TRUE, .options = furrr_options(seed = 234))
 rslt4_df <- list_rbind(rslt4)
 
 
