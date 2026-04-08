@@ -256,6 +256,7 @@ simulate_one_rand_IA <- function(data, target, cov_list, crit_val=0, L=15000,
 
 ## Load the synthetic dataset generated from the SAFIR02-BREAST dataset (syn_BREAST.xlsx).
 ## It includes the following variables:
+## * "TARGET": name of the biomarker;
 ## * "targeted_therapy": therapy tailored to the characteristics of the patient;
 ## * "armAB": treatment arm ('A' or 'B');
 ## * "breast_molec_alt": breast molecular alteration;
@@ -279,75 +280,28 @@ syn_BREAST$time_event <- as.numeric(syn_BREAST$PFS)
 db_escat <- syn_BREAST[syn_BREAST$escat_class %in% c("I","II"),]
 nrow(db_escat)
 
-# EXTERNAL MODIFICATIONS:
-# drop of: AZD8931 (and AZD4547, AZD2014, VANDETANIB)
-db_escat %>%
-  filter(armAB == "A") %>%
-  with(table(targeted_therapy))
-
-# Stratified Cox models with AZD8931, AZD4547, AZD2014, and VANDETANIB
+# Stratified Cox models 
 table(db_escat$armAB,db_escat$event)
 db_escat <- db_escat %>%
   arrange(date_rand)
 PFS_surv_obj_escat <- Surv(time = db_escat$time_event, event = db_escat$event)
 summary(coxph(PFS_surv_obj_escat ~ armAB + strata(breast_molec_alt) + 
                 strata(chemo_line) + strata(disease_status), data = db_escat))
-# Stratified Cox models without AZD8931, AZD4547, AZD2014, and VANDETANIB
-db_ext_escat <- db_escat[!(db_escat$targeted_therapy %in% c("AZD8931","AZD4547","AZD2014","VANDETANIB")
-                           & db_escat$armAB=='A'),]
-table(db_ext_escat$armAB,db_ext_escat$event)
-db_ext_escat <- db_ext_escat %>%
-  arrange(date_rand)
-PFS_surv_obj_ext_escat  <- Surv(time = db_ext_escat$time_event, event = db_ext_escat$event)
-summary(coxph(PFS_surv_obj_ext_escat ~ armAB + strata(breast_molec_alt) + 
-                strata(chemo_line) + strata(disease_status), data = db_ext_escat))
 
-# Kaplan-Meyer curve (with AZD8931, AZD4547, AZD2014, and VANDETANIB)
-PFS_km_fit_escat_arm <- survfit(PFS_surv_obj_escat ~ armAB, data = db_escat, conf.int = 0.90)
+# Kaplan-Meyer curve 
+PFS_km_fit_escat_arm <- survfit(PFS_surv_obj_escat ~ armAB, data = db_escat, conf.int = 0.95)
 PFS_plot_escat <- ggsurvplot(PFS_km_fit_escat_arm,
                              risk.table = TRUE,
                              censored = TRUE,
                              risk.table.col = "strata",
-                             palette = c("blue", "red"),
+                             palette = c("red", "blue"),
                              xlab = "PFS in months",
                              xlim = c(0, 60),
                              break.time.by = 6,
                              ylab = "Survival probability",
                              legend.title = "",
-                             legend.labs = c("Targeted therapy","Standard of care"))
+                             legend.labs = c("Standard of care","Targeted therapy"))
 print(PFS_plot_escat)
-
-# Permutation-based test
-
-# Stratified log-rank test
-S_obs_strat_escat <- survdiff(PFS_surv_obj_ext_escat ~ armAB + strata(breast_molec_alt) + 
-                                strata(chemo_line) + strata(disease_status), data = db_ext_escat)$chisq
-pvalue_obs_strat_escat <- survdiff(PFS_surv_obj_ext_escat ~ armAB + strata(breast_molec_alt) + 
-                                     strata(chemo_line) + strata(disease_status), data = db_ext_escat)$pvalue
-
-# Parallelization
-future::availableCores() # check the number of available cores 
-plan(multisession, workers = future::availableCores() - 2)
-
-L <- 15000
-cov_list <- c("breast_molec_alt","chemo_line","disease_status")
-ntrt <- length(unique(db_ext_escat$armAB))
-ratio <- c(2, 1) # treated:control
-covwt <- rep(1, length(cov_list))
-rslt1 <- furrr::future_map(1:L, ~{
-  simulate_one_rand_EXT(data = db_ext_escat, 
-                        cov_list = cov_list, 
-                        ntrt = ntrt, 
-                        ratio = ratio, 
-                        covwt = covwt
-                        ) %>%
-    mutate(sim=.x)
-}, .progress = TRUE, .options = furrr_options(seed = 1234))
-rslt1_df <- list_rbind(rslt1) 
-
-print(paste("Observed p-value: ",pvalue_obs_strat_escat))
-pvalue_rand_strat_escat <- 1/L*sum(ifelse(abs(rslt1_df$S_rand_strat) >= abs(S_obs_strat_escat),1,0))
-print(paste("Permutation p-value: ",pvalue_rand_strat_escat))
 
 
 ## OVERALL population
@@ -358,6 +312,15 @@ syn_BREAST %>%
   filter(armAB == "A") %>%
   with(table(targeted_therapy))
 
+targets_of_interest <- syn_BREAST %>%
+  filter(
+    armAB == "A",
+    targeted_therapy %in% c("AZD8931", "AZD4547", "AZD2014", "VANDETANIB")
+  ) %>%
+  pull(TARGET) %>%
+  unique()  
+print(targets_of_interest)
+
 # Stratified Cox models with AZD8931, AZD4547, AZD2014, and VANDETANIB
 table(syn_BREAST$armAB,syn_BREAST$event)
 syn_BREAST <- syn_BREAST %>%
@@ -366,8 +329,7 @@ PFS_surv_obj_BREAST <- Surv(time = syn_BREAST$time_event, event = syn_BREAST$eve
 summary(coxph(PFS_surv_obj_BREAST ~ armAB + strata(breast_molec_alt) + 
                 strata(chemo_line) + strata(disease_status), data = syn_BREAST))
 # Stratified Cox models without AZD8931, AZD4547, AZD2014, and VANDETANIB
-db_ext_BREAST <- syn_BREAST[!(syn_BREAST$targeted_therapy %in% c("AZD8931","AZD4547","AZD2014","VANDETANIB") 
-                              & syn_BREAST$armAB=='A'),]
+db_ext_BREAST <- syn_BREAST[!(syn_BREAST$TARGET %in% targets_of_interest),]
 table(db_ext_BREAST$armAB,db_ext_BREAST$event)
 db_ext_BREAST <- db_ext_BREAST %>%
   arrange(date_rand)
@@ -381,13 +343,13 @@ PFS_plot_BREAST <- ggsurvplot(PFS_km_fit_BREAST_arm,
                               risk.table = TRUE,
                               censored = TRUE,
                               risk.table.col = "strata",
-                              palette = c("blue", "red"),
+                              palette = c("red", "blue"),
                               xlab = "PFS in months",
                               xlim = c(0, 60),
                               break.time.by = 6,
                               ylab = "Survival probability",
                               legend.title = "",
-                              legend.labs = c("Targeted therapy","Standard of care"))
+                              legend.labs = c("Standard of care","Targeted therapy"))
 print(PFS_plot_BREAST)
 
 # Permutation test
@@ -508,20 +470,20 @@ PFS_surv_obj_noSELUMETINIB  <- Surv(time = syn_LUNG_noSELUMETINIB$time_event,
 summary(coxph(PFS_surv_obj_noSELUMETINIB ~ armAB + strata(histo_2cl) + strata(Disease_status) + 
                 strata(Smoking_status) + strata(molecular_cat), data = syn_LUNG_noSELUMETINIB))
 
-# Kaplan-Meyer curve (with SELUMETINIB)
-PFS_km_fit_LUNG_arm <- survfit(PFS_surv_obj_LUNG ~ armAB, data = syn_LUNG)
-PFS_plot_LUNG <- ggsurvplot(PFS_km_fit_LUNG_arm,
+# Kaplan-Meyer curve (without SELUMETINIB)
+PFS_km_fit_noSELUMETINIB_arm <- survfit(PFS_surv_obj_noSELUMETINIB ~ armAB, data = syn_LUNG_noSELUMETINIB)
+PFS_plot_noSELUMETINIB <- ggsurvplot(PFS_km_fit_noSELUMETINIB_arm,
                             risk.table = TRUE,
                             censored = TRUE,
                             risk.table.col = "strata",
-                            palette = c("blue", "red"),
+                            palette = c("red", "blue"),
                             xlab = "PFS in months",
-                            # xlim = c(0, 12),
-                            break.time.by = 3,
+                            xlim = c(0, 42),
+                            break.time.by = 6,
                             ylab = "Survival probability",
                             legend.title = "",
-                            legend.labs = c("Targeted therapy","Standard of care"))
-print(PFS_plot_LUNG)
+                            legend.labs = c("Standard of care","Targeted therapy"))
+print(PFS_plot_noSELUMETINIB)
 
 # Permutation test
 
@@ -540,7 +502,7 @@ cov_list <- c("histo_2cl","Disease_status","Smoking_status","molecular_cat")
 ntrt <- length(unique(syn_LUNG$armAB))
 ratio <- c(2, 1) # treated:control
 covwt <- rep(1, length(cov_list))
-crit_val <- 1.96
+crit_val <- 0 # 0.34
 L <- 15000
 max_attempts <- 100000
 rslt3 <- furrr::future_map(1:1, ~{
