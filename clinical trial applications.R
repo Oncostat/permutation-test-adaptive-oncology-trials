@@ -355,7 +355,7 @@ print(PFS_plot_ext_BREAST)
 
 # Permutation test
 
-# stratified Cox models: stratified log-rank test
+# Stratified log-rank test
 S_obs_strat_BREAST <- survdiff(PFS_surv_obj_ext_BREAST ~ armAB + strata(breast_molec_alt) + 
                                  strata(chemo_line) + strata(disease_status), data = db_ext_BREAST)$chisq
 pvalue_obs_strat_BREAST <- survdiff(PFS_surv_obj_ext_BREAST ~ armAB + strata(breast_molec_alt) + 
@@ -456,12 +456,13 @@ syn_LUNG %>%
   filter(TARGET == "KRAS",event == 1) %>%
   with(table(stage))
 
-# Stratified Cox model with SELUMETINIB
-syn_LUNG <- syn_LUNG %>%
-  arrange(date_rand)
-PFS_surv_obj_LUNG  <- Surv(time = syn_LUNG$time_event, event = syn_LUNG$event)
-summary(coxph(PFS_surv_obj_LUNG ~ armAB + strata(histo_2cl) + strata(Disease_status) + 
-                strata(Smoking_status) + strata(molecular_cat), data = syn_LUNG))
+# # Stratified Cox model with SELUMETINIB
+# syn_LUNG <- syn_LUNG %>%
+#   arrange(date_rand)
+# PFS_surv_obj_LUNG  <- Surv(time = syn_LUNG$time_event, event = syn_LUNG$event)
+# summary(coxph(PFS_surv_obj_LUNG ~ armAB + strata(histo_2cl) + strata(Disease_status) + 
+#                 strata(Smoking_status) + strata(molecular_cat), data = syn_LUNG))
+  
 # Stratified Cox model without SELUMETINIB
 syn_LUNG_noSELUMETINIB <- syn_LUNG[!(syn_LUNG$treatment %in% c("SELUMETINIB")),]
 syn_LUNG_noSELUMETINIB <- syn_LUNG_noSELUMETINIB %>%
@@ -488,7 +489,7 @@ print(PFS_plot_noSELUMETINIB)
 
 # Permutation test
 
-# stratified Cox models: stratified log-rank test
+# Stratified log-rank test
 S_obs_strat_LUNG <- survdiff(PFS_surv_obj_LUNG ~ armAB + strata(histo_2cl) + strata(Disease_status) + 
                                strata(Smoking_status) + strata(molecular_cat), data = syn_LUNG)$chisq
 pvalue_obs_strat_LUNG <- survdiff(PFS_surv_obj_LUNG ~ armAB + strata(histo_2cl) + strata(Disease_status) + 
