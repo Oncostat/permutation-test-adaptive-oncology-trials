@@ -362,6 +362,9 @@ pvalue_obs_strat_BREAST <- survdiff(PFS_surv_obj_ext_BREAST ~ armAB + strata(bre
                                       strata(chemo_line) + strata(disease_status), data = db_ext_BREAST)$pvalue
 
 # Parallelization
+future::availableCores() # check the number of available cores 
+plan(multisession, workers = future::availableCores() - 2)
+
 L <- 15000
 cov_list <- c("breast_molec_alt","chemo_line","disease_status")
 ntrt <- length(unique(db_ext_BREAST$armAB))
