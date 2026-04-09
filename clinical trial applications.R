@@ -460,9 +460,9 @@ syn_LUNG %>%
   with(table(stage))
 
 # # Stratified Cox model with SELUMETINIB
-# syn_LUNG <- syn_LUNG %>%
-#   arrange(date_rand)
-# PFS_surv_obj_LUNG  <- Surv(time = syn_LUNG$time_event, event = syn_LUNG$event)
+syn_LUNG <- syn_LUNG %>%
+  arrange(date_rand)
+PFS_surv_obj_LUNG  <- Surv(time = syn_LUNG$time_event, event = syn_LUNG$event)
 # summary(coxph(PFS_surv_obj_LUNG ~ armAB + strata(histo_2cl) + strata(Disease_status) + 
 #                 strata(Smoking_status) + strata(molecular_cat), data = syn_LUNG))
   
