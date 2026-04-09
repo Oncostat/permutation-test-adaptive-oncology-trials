@@ -321,13 +321,13 @@ targets_of_interest <- syn_BREAST %>%
   unique()  
 print(targets_of_interest)
 
-# Stratified Cox models with AZD8931, AZD4547, AZD2014, and VANDETANIB
-table(syn_BREAST$armAB,syn_BREAST$event)
-syn_BREAST <- syn_BREAST %>%
-  arrange(date_rand)
-PFS_surv_obj_BREAST <- Surv(time = syn_BREAST$time_event, event = syn_BREAST$event)
-summary(coxph(PFS_surv_obj_BREAST ~ armAB + strata(breast_molec_alt) + 
-                strata(chemo_line) + strata(disease_status), data = syn_BREAST))
+# # Stratified Cox models with AZD8931, AZD4547, AZD2014, and VANDETANIB
+# table(syn_BREAST$armAB,syn_BREAST$event)
+# syn_BREAST <- syn_BREAST %>%
+#   arrange(date_rand)
+# PFS_surv_obj_BREAST <- Surv(time = syn_BREAST$time_event, event = syn_BREAST$event)
+# summary(coxph(PFS_surv_obj_BREAST ~ armAB + strata(breast_molec_alt) + 
+#                 strata(chemo_line) + strata(disease_status), data = syn_BREAST))
 # Stratified Cox models without AZD8931, AZD4547, AZD2014, and VANDETANIB
 db_ext_BREAST <- syn_BREAST[!(syn_BREAST$TARGET %in% targets_of_interest),]
 table(db_ext_BREAST$armAB,db_ext_BREAST$event)
@@ -337,9 +337,9 @@ PFS_surv_obj_ext_BREAST  <- Surv(time = db_ext_BREAST$time_event, event = db_ext
 summary(coxph(PFS_surv_obj_ext_BREAST ~ armAB + strata(breast_molec_alt) + 
                 strata(chemo_line) + strata(disease_status), data = db_ext_BREAST))
 
-# Kaplan-Meyer curve (with AZD8931, AZD4547, AZD2014, and VANDETANIB)
-PFS_km_fit_BREAST_arm <- survfit(PFS_surv_obj_BREAST ~ armAB, data = syn_BREAST, conf.int = 0.95)
-PFS_plot_BREAST <- ggsurvplot(PFS_km_fit_BREAST_arm,
+# Kaplan-Meyer curve (without AZD8931, AZD4547, AZD2014, and VANDETANIB)
+PFS_km_fit_ext_BREAST_arm <- survfit(PFS_surv_obj_ext_BREAST ~ armAB, data = db_ext_BREAST, conf.int = 0.95)
+PFS_plot_ext_BREAST <- ggsurvplot(PFS_km_fit_ext_BREAST_arm,
                               risk.table = TRUE,
                               censored = TRUE,
                               risk.table.col = "strata",
@@ -350,7 +350,7 @@ PFS_plot_BREAST <- ggsurvplot(PFS_km_fit_BREAST_arm,
                               ylab = "Survival probability",
                               legend.title = "",
                               legend.labs = c("Standard of care","Targeted therapy"))
-print(PFS_plot_BREAST)
+print(PFS_plot_ext_BREAST)
 
 # Permutation test
 
@@ -361,7 +361,7 @@ pvalue_obs_strat_BREAST <- survdiff(PFS_surv_obj_ext_BREAST ~ armAB + strata(bre
                                       strata(chemo_line) + strata(disease_status), data = db_ext_BREAST)$pvalue
 
 # Parallelization
-# L <- 15000
+L <- 15000
 cov_list <- c("breast_molec_alt","chemo_line","disease_status")
 ntrt <- length(unique(db_ext_BREAST$armAB))
 ratio <- c(2, 1) # treated:control
