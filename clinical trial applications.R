@@ -328,6 +328,7 @@ print(targets_of_interest)
 # PFS_surv_obj_BREAST <- Surv(time = syn_BREAST$time_event, event = syn_BREAST$event)
 # summary(coxph(PFS_surv_obj_BREAST ~ armAB + strata(breast_molec_alt) + 
 #                 strata(chemo_line) + strata(disease_status), data = syn_BREAST))
+
 # Stratified Cox models without AZD8931, AZD4547, AZD2014, and VANDETANIB
 db_ext_BREAST <- syn_BREAST[!(syn_BREAST$TARGET %in% targets_of_interest),]
 table(db_ext_BREAST$armAB,db_ext_BREAST$event)
