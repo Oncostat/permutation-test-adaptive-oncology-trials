@@ -276,36 +276,6 @@ syn_BREAST$armAB <- relevel(syn_BREAST$armAB, ref = "B")
 syn_BREAST$event <- as.numeric(syn_BREAST$PFS_event)
 syn_BREAST$time_event <- as.numeric(syn_BREAST$PFS)
 
-## ESCAT I/II population
-db_escat <- syn_BREAST[syn_BREAST$escat_class %in% c("I","II"),]
-nrow(db_escat)
-
-# Stratified Cox models 
-table(db_escat$armAB,db_escat$event)
-db_escat <- db_escat %>%
-  arrange(date_rand)
-PFS_surv_obj_escat <- Surv(time = db_escat$time_event, event = db_escat$event)
-summary(coxph(PFS_surv_obj_escat ~ armAB + strata(breast_molec_alt) + 
-                strata(chemo_line) + strata(disease_status), data = db_escat))
-
-# Kaplan-Meyer curve 
-PFS_km_fit_escat_arm <- survfit(PFS_surv_obj_escat ~ armAB, data = db_escat, conf.int = 0.95)
-PFS_plot_escat <- ggsurvplot(PFS_km_fit_escat_arm,
-                             risk.table = TRUE,
-                             censored = TRUE,
-                             risk.table.col = "strata",
-                             palette = c("red", "blue"),
-                             xlab = "PFS in months",
-                             xlim = c(0, 60),
-                             break.time.by = 6,
-                             ylab = "Survival probability",
-                             legend.title = "",
-                             legend.labs = c("Standard of care","Targeted therapy"))
-print(PFS_plot_escat)
-
-
-## OVERALL population
-
 # EXTERNAL MODIFICATIONS:
 # drop of: AZD8931, AZD4547, AZD2014, and VANDETANIB
 syn_BREAST %>%
@@ -320,6 +290,77 @@ targets_of_interest <- syn_BREAST %>%
   pull(TARGET) %>%
   unique()  
 print(targets_of_interest)
+
+## ESCAT I/II population
+db_escat <- syn_BREAST[syn_BREAST$escat_class %in% c("I","II"),]
+nrow(db_escat)
+
+# # Stratified Cox models with AZD8931, AZD4547, AZD2014, and VANDETANIB
+# table(db_escat$armAB,db_escat$event)
+# db_escat <- db_escat %>%
+#   arrange(date_rand)
+# PFS_surv_obj_escat <- Surv(time = db_escat$time_event, event = db_escat$event)
+# summary(coxph(PFS_surv_obj_escat ~ armAB + strata(breast_molec_alt) + 
+#                 strata(chemo_line) + strata(disease_status), data = db_escat))
+
+# Stratified Cox models without AZD8931, AZD4547, AZD2014, and VANDETANIB
+db_ext_escat <- db_escat[!(db_escat$TARGET %in% targets_of_interest),]
+table(db_ext_escat$armAB,db_ext_escat$event)
+db_ext_escat <- db_ext_escat %>%
+  arrange(date_rand)
+PFS_surv_obj_ext_escat  <- Surv(time = db_ext_escat$time_event, event = db_ext_escat$event)
+summary(coxph(PFS_surv_obj_ext_escat ~ armAB + strata(breast_molec_alt) + 
+                strata(chemo_line) + strata(disease_status), data = db_ext_escat))
+
+# Kaplan-Meier curve (without AZD8931, AZD4547, AZD2014, and VANDETANIB)
+PFS_km_fit_ext_escat_arm <- survfit(PFS_surv_obj_ext_escat ~ armAB, data = db_ext_escat, conf.int = 0.95)
+PFS_plot_ext_escat <- ggsurvplot(PFS_km_fit_ext_escat_arm,
+                                  risk.table = TRUE,
+                                  censored = TRUE,
+                                  risk.table.col = "strata",
+                                  palette = c("red", "blue"),
+                                  xlab = "PFS in months",
+                                  xlim = c(0, 60),
+                                  break.time.by = 6,
+                                  ylab = "Survival probability",
+                                  legend.title = "",
+                                  legend.labs = c("Standard of care","Targeted therapy"))
+print(PFS_plot_ext_escat)
+
+# Permutation test
+
+# Stratified log-rank test
+S_obs_strat_escat <- survdiff(PFS_surv_obj_ext_escat ~ armAB + strata(breast_molec_alt) + 
+                                 strata(chemo_line) + strata(disease_status), data = db_ext_escat)$chisq
+pvalue_obs_strat_escat <- survdiff(PFS_surv_obj_ext_escat ~ armAB + strata(breast_molec_alt) + 
+                                      strata(chemo_line) + strata(disease_status), data = db_ext_escat)$pvalue
+
+# Parallelization
+future::availableCores() # check the number of available cores 
+plan(multisession, workers = future::availableCores() - 2)
+
+L <- 15000
+cov_list <- c("breast_molec_alt","chemo_line","disease_status")
+ntrt <- length(unique(db_ext_escat$armAB))
+ratio <- c(2, 1) # treated:control
+covwt <- rep(1, length(cov_list))
+rslt2 <- furrr::future_map(1:L, ~{
+  simulate_one_rand_EXT(data = db_ext_escat, 
+                        cov_list = cov_list, 
+                        ntrt = ntrt, 
+                        ratio = ratio, 
+                        covwt = covwt
+  ) %>%
+    mutate(sim=.x)
+}, .progress = TRUE, .options = furrr_options(seed = 1234))
+rslt2_df <- list_rbind(rslt2) 
+
+print(paste("Observed p-value: ",pvalue_obs_strat_escat))
+pvalue_rand_strat_escat <- 1/L*sum(ifelse(abs(rslt2_df$S_rand_strat) >= abs(S_obs_strat_escat),1,0))
+print(paste("Permutation p-value: ",pvalue_rand_strat_escat))
+
+
+## OVERALL population
 
 # # Stratified Cox models with AZD8931, AZD4547, AZD2014, and VANDETANIB
 # table(syn_BREAST$armAB,syn_BREAST$event)
@@ -338,7 +379,7 @@ PFS_surv_obj_ext_BREAST  <- Surv(time = db_ext_BREAST$time_event, event = db_ext
 summary(coxph(PFS_surv_obj_ext_BREAST ~ armAB + strata(breast_molec_alt) + 
                 strata(chemo_line) + strata(disease_status), data = db_ext_BREAST))
 
-# Kaplan-Meyer curve (without AZD8931, AZD4547, AZD2014, and VANDETANIB)
+# Kaplan-Meier curve (without AZD8931, AZD4547, AZD2014, and VANDETANIB)
 PFS_km_fit_ext_BREAST_arm <- survfit(PFS_surv_obj_ext_BREAST ~ armAB, data = db_ext_BREAST, conf.int = 0.95)
 PFS_plot_ext_BREAST <- ggsurvplot(PFS_km_fit_ext_BREAST_arm,
                               risk.table = TRUE,
@@ -362,10 +403,10 @@ pvalue_obs_strat_BREAST <- survdiff(PFS_surv_obj_ext_BREAST ~ armAB + strata(bre
                                       strata(chemo_line) + strata(disease_status), data = db_ext_BREAST)$pvalue
 
 # Parallelization
-future::availableCores() # check the number of available cores 
-plan(multisession, workers = future::availableCores() - 2)
+# future::availableCores() # check the number of available cores 
+# plan(multisession, workers = future::availableCores() - 2)
 
-L <- 15000
+# L <- 15000
 cov_list <- c("breast_molec_alt","chemo_line","disease_status")
 ntrt <- length(unique(db_ext_BREAST$armAB))
 ratio <- c(2, 1) # treated:control
@@ -465,7 +506,7 @@ syn_LUNG <- syn_LUNG %>%
 PFS_surv_obj_LUNG  <- Surv(time = syn_LUNG$time_event, event = syn_LUNG$event)
 # summary(coxph(PFS_surv_obj_LUNG ~ armAB + strata(histo_2cl) + strata(Disease_status) + 
 #                 strata(Smoking_status) + strata(molecular_cat), data = syn_LUNG))
-  
+
 # Stratified Cox model without SELUMETINIB
 syn_LUNG_noSELUMETINIB <- syn_LUNG[!(syn_LUNG$treatment %in% c("SELUMETINIB")),]
 syn_LUNG_noSELUMETINIB <- syn_LUNG_noSELUMETINIB %>%
@@ -475,7 +516,7 @@ PFS_surv_obj_noSELUMETINIB  <- Surv(time = syn_LUNG_noSELUMETINIB$time_event,
 summary(coxph(PFS_surv_obj_noSELUMETINIB ~ armAB + strata(histo_2cl) + strata(Disease_status) + 
                 strata(Smoking_status) + strata(molecular_cat), data = syn_LUNG_noSELUMETINIB))
 
-# Kaplan-Meyer curve (without SELUMETINIB)
+# Kaplan-Meier curve (without SELUMETINIB)
 PFS_km_fit_noSELUMETINIB_arm <- survfit(PFS_surv_obj_noSELUMETINIB ~ armAB, data = syn_LUNG_noSELUMETINIB)
 PFS_plot_noSELUMETINIB <- ggsurvplot(PFS_km_fit_noSELUMETINIB_arm,
                             risk.table = TRUE,
@@ -531,10 +572,3 @@ pvalue_rand_strat_LUNG <- (1/rslt3_df$total_attempts[1])*
   sum(ifelse(abs(rslt3_df$S_rand_strat) >= abs(S_obs_strat_LUNG),1,0))
 print(paste("Permutation p-value: ",pvalue_rand_strat_LUNG))
 print(paste("Total number of attemps: ",rslt3_df$total_attempts[1]))
-
-
-
-
-
-
-
