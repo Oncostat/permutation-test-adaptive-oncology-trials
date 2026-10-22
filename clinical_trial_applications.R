@@ -3,7 +3,7 @@
 ## algorithm in randomized precision oncology trials" by Marelli et al.
 ## Before running the code, please download the synthetic datasets syn_BREAST.xlsx and syn_LUNG.xlsx.
 
-## Install and upload packages and functions
+## Install and upload packages and functions 
 
 # install.packages("readxl")
 library(readxl)
