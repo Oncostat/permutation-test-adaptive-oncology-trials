@@ -2003,12 +2003,13 @@ simulate_one <- function(type_outcome = "continuous",
 
 ## Parallelization
 future::availableCores() # check the number of available cores 
-plan(multisession, workers = 10)
+plan(multisession, workers = future::availableCores()-2)
 
 ## Running simulation studies
 seed <- 234
-Ntrials <- 10
-Nperms <- 1
+Ntrials <- 10000
+Nperms <- 1000
+Natts <- 100000
 
 # CONTINUOUS OUTCOMES
 
@@ -2143,7 +2144,6 @@ print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_EXT_ORIENT
               ((Ntrials-sum(rslt_cont_EXT_ORIENT_H1_df$F3_nullWALD, na.rm = T))*Nperms)*100, "%"))
 
 # Scenario IA-DROP
-Natts <- 100000
 # H0
 rslt_cont_IA_DROP_H0 <- furrr::future_map(1:Ntrials, ~{
   simulate_one(type_outcome = "continuous",
@@ -2221,7 +2221,7 @@ rslt_cont_IA_ORIENT_H0 <- furrr::future_map(1:Ntrials, ~{
                               0,0,0,0,
                               0,0,0,0,
                               0,0,0,0), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = NULL, z_c = 0, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = Natts) %>%
+               drop_trt = NULL, z_c = -0.84, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = Natts) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_cont_IA_ORIENT_H0_df <- list_rbind(rslt_cont_IA_ORIENT_H0)
@@ -2262,7 +2262,7 @@ rslt_cont_IA_ORIENT_H1 <- furrr::future_map(1:Ntrials, ~{
                               0,0.4,0,0,
                               0,0,0.4,0,
                               0.4,0.4,0.4,-0.4), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = NULL, z_c = 0, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = Natts) %>%
+               drop_trt = NULL, z_c = -0.84, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = Natts) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_cont_IA_ORIENT_H1_df <- list_rbind(rslt_cont_IA_ORIENT_H1)
@@ -2291,7 +2291,8 @@ print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_IA_ORIENT_
 
 
 # SURVIVAL OUTCOMES
-
+seed = 1234
+      
 # Scenario EXT-DROP
 # H0
 rslt_surv_EXT_DROP_H0 <- furrr::future_map(1:Ntrials, ~{
@@ -2433,7 +2434,7 @@ rslt_surv_IA_DROP_H0 <- furrr::future_map(1:Ntrials, ~{
                               0,0,0,0,
                               0,0,0,0,
                               0,0,0,0), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = NULL, z_c = -0.84, probs_orient = NULL, L = Nperms, max_atts = Natts) %>%
+               drop_trt = NULL, z_c = 0.9, probs_orient = NULL, L = Nperms, max_atts = Natts) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_surv_IA_DROP_H0_df <- list_rbind(rslt_surv_IA_DROP_H0)
@@ -2468,7 +2469,7 @@ print(paste("Convergence issues in permutations:", sum(rslt_surv_IA_DROP_H0_df$c
 #                               0,-0.4,0,0,
 #                               0,0,-0.4,0,
 #                               0,0,0,0.4), nrow = 4, ncol = 4, byrow = TRUE),
-#                drop_trt = NULL, z_c = -0.84, probs_orient = NULL, L = Nperms, max_atts = Natts) %>%
+#                drop_trt = NULL, z_c = 0.9, probs_orient = NULL, L = Nperms, max_atts = Natts) %>%
 #     mutate(sim=.x)
 # }, .progress = TRUE, .options = furrr_options(seed = seed))
 # rslt_surv_IA_DROP_H1_df <- list_rbind(rslt_surv_IA_DROP_H1)
@@ -2504,7 +2505,7 @@ rslt_surv_IA_ORIENT_H0 <- furrr::future_map(1:Ntrials, ~{
                               0,0,0,0,
                               0,0,0,0,
                               0,0,0,0), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = NULL, z_c = 0, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = Natts) %>%
+               drop_trt = NULL, z_c = 0.9, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = Natts) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_surv_IA_ORIENT_H0_df <- list_rbind(rslt_surv_IA_ORIENT_H0)
@@ -2539,7 +2540,7 @@ print(paste("Convergence issues in permutations:", sum(rslt_surv_IA_ORIENT_H0_df
 #                               0,-0.4,0,0,
 #                               0,0,-0.4,0,
 #                               -0.4,-0.4,-0.4,0.4), nrow = 4, ncol = 4, byrow = TRUE),
-#                drop_trt = NULL, z_c = 0, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = Natts) %>%
+#                drop_trt = NULL, z_c = 0.9, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = Natts) %>%
 #     mutate(sim=.x)
 # }, .progress = TRUE, .options = furrr_options(seed = seed))
 # rslt_surv_IA_ORIENT_H1_df <- list_rbind(rslt_surv_IA_ORIENT_H1)
