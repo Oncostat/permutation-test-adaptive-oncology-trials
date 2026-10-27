@@ -896,17 +896,14 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
     new_ctrl_label <- new_trt_labels[1]
     new_trt_label <- new_trt_labels[2]
     new_M <- length(unique(new_dataset1$stratum_assign))
-    new_stddiff <- sapply(1:new_M, function(s_assign) {
-      new_stratum_ctrl <- new_dataset1[new_dataset1$stratum_assign == s_assign & 
+    new_stddiff <- sapply(1:new_M, function(new_s_assign) {
+      new_stratum_ctrl <- new_dataset1[new_dataset1$stratum_assign == new_s_assign & 
                                          new_dataset1$trt == new_ctrl_label, ]
-      new_stratum_trt <- new_dataset1[new_dataset1$stratum_assign == s_assign & 
+      new_stratum_trt <- new_dataset1[new_dataset1$stratum_assign == new_s_assign & 
                                         new_dataset1$trt == new_trt_label, ]
       new_mean_diff <- mean(new_stratum_trt$y) - mean(new_stratum_ctrl$y)
-      new_sd_pooled <- sqrt(((nrow(new_stratum_trt)-1)*var(new_stratum_trt$y) +
-                               (nrow(new_stratum_ctrl)-1)*var(new_stratum_ctrl$y))/
-                              (nrow(new_stratum_trt)+nrow(new_stratum_ctrl)-2))
-      new_denom <- new_sd_pooled*(1/nrow(new_stratum_trt)+1/nrow(new_stratum_ctrl))
-      return(new_mean_diff / new_denom)
+      new_sd_ctrl <- sd(new_stratum_ctrl$y) # extension required for different variances (heteroschedasticity)
+      return(new_mean_diff / new_sd_ctrl)
     })
     
     new_min_diff <- min(new_stddiff)
