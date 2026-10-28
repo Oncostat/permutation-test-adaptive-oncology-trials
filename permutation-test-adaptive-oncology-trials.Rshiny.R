@@ -21,7 +21,7 @@ library(Minirand)
 
 # Auxiliary functions saved in aux_functions.R file.
 # Preferred location: aux_functions.R in the same folder as this file.
-aux_file <- "//nas-01/SBE_ETUDES/SAFIR02/Translation_Projects/Christina/PhD project/abstracts and papers/Paper axis 1/github code/aux_functions.R"
+aux_file <- "aux_functions.R" # change your path if necessary
 source(aux_file)
 
 `%||%` <- function(a, b) if (is.null(a) || length(a) == 0 || (length(a) == 1 && is.na(a))) b else a
