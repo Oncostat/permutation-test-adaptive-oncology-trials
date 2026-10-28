@@ -21,7 +21,7 @@ library(Minirand)
 
 # Auxiliary functions saved in aux_functions.R file.
 # Preferred location: aux_functions.R in the same folder as this file.
-aux_file <- "aux_functions.R" # change your path here if necessary
+aux_file <- "//nas-01/SBE_ETUDES/SAFIR02/Translation_Projects/Christina/PhD project/abstracts and papers/Paper axis 1/github code/aux_functions.R"
 source(aux_file)
 
 `%||%` <- function(a, b) if (is.null(a) || length(a) == 0 || (length(a) == 1 && is.na(a))) b else a
@@ -135,6 +135,22 @@ default_tau_off <- function(eff) matrix(eff, nrow = length(eff), ncol = length(e
 tau_df <- function(eff, m) {
   M <- length(eff)
   diag(m) <- eff
+  df <- data.frame(paste("Alteration", seq_len(M)), m, check.names = FALSE)
+  names(df) <- c("Original alteration (M)", paste("Assigned to stratum", seq_len(M)))
+  df
+}
+
+# Orientation probabilities: M x M matrix, 0 on the diagonal, equal probabilities elsewhere
+# (each row sums to 1; for M = 1 the matrix is just 0)
+default_probs_orient <- function(M) {
+  m <- matrix(if (M > 1) 1 / (M - 1) else 0, nrow = M, ncol = M)
+  diag(m) <- 0
+  m
+}
+
+# Data frame shown in the app: probs[original alteration, assigned stratum]
+probs_df <- function(m) {
+  M <- nrow(m)
   df <- data.frame(paste("Alteration", seq_len(M)), m, check.names = FALSE)
   names(df) <- c("Original alteration (M)", paste("Assigned to stratum", seq_len(M)))
   df
@@ -302,8 +318,8 @@ methods_content <- function(p) {
            if (!orient) {
              "The adaptation determines two stages of the trial. In case of adaptation, stage I patients belonging to the dropped strata are removed from the analysis (new stage I sample size 'N1_kept') and 'N2' = N-N1_kept new patients are enolled at stage II from the remaining alterations only (DROP), with prevalence rescaled to sum to 1. Treatment effects 'tau' are unchanged."
            } else {
-             "The adaptation determines two stages of the trial. In case of adaptation, stage I patients belonging to the dropped strata are removed from the analysis (new stage I sample size 'N1_kept') and 'N2' = N-N1_kept new patients are enolled at stage II from all the original alterations (ORIENT) with the original prevalence; those belonging to the dropped alteration are oriented to one of the remaining strata with probability 'probs_orient' by block randomization. The treatment effect 'tau' of oriented patients changes according to the stratum they are oriented into."
-           },
+             "The adaptation determines two stages of the trial. In case of adaptation, stage I patients belonging to the dropped strata are removed from the analysis (new stage I sample size 'N1_kept') and 'N2' = N-N1_kept new patients are enolled at stage II from all the original alterations (ORIENT) with the original prevalence; those belonging to the dropped alteration are oriented to one of the remaining strata with probability given by the row of the matrix 'probs_orient' corresponding to the dropped alteration (the diagonal is 0) by block randomization. The treatment effect 'tau' of oriented patients changes according to the stratum they are oriented into."
+             },
            
            "At stage II, new patients are randomized to the matching experimental treatment or to the standard-of-care with the same randomization procedure used in stage I."
          )),
@@ -402,10 +418,9 @@ run_simulation <- function(p) {
   M      <- p$M
   orient <- identical(p$stageII_approach, "ORIENT")
   
-  # p$prevalence <- p$prevalence / sum(p$prevalence)
-  # if (orient) p$probs_orient <- p$probs_orient / sum(p$probs_orient)
   p$prevalence <- p$prevalence / sum(p$prevalence)
-  if (orient) p$probs_orient <- p$probs_orient / sum(p$probs_orient)
+  # if (orient) p$probs_orient <- p$probs_orient / sum(p$probs_orient)
+  # if (orient && p$M >= 2) p$probs_orient <- prop.table(p$probs_orient, 1)
   
   tau_H0 <- matrix(0, nrow = M, ncol = M)
   # tau_H1 <- make_tau(p$tau, M, if (orient) p$tau_off else NULL)
@@ -413,10 +428,22 @@ run_simulation <- function(p) {
   
   base_args <- build_args(p)
   
-  # One replication; returns the tibble of simulate_one() or the error message
+  # One replication; returns list(result = tibble or error message, warnings = character vector)
   one_rep <- function(i, tau) {
-    tryCatch(do.call(simulate_one, c(base_args, list(tau = tau))),
-             error = function(e) conditionMessage(e))
+    warns <- character(0)
+    # warnings shown in the app (the others only go to the console)
+    shown <- c("blocksize is greater than the number of subjects",
+               "permutations obtained out of")
+    out <- withCallingHandlers(
+      tryCatch(do.call(simulate_one, c(base_args, list(tau = tau))),
+               error = function(e) conditionMessage(e)),
+      warning = function(w) {
+        msg <- conditionMessage(w)
+        if (any(vapply(shown, function(s) grepl(s, msg, fixed = TRUE), logical(1))))
+          warns <<- c(warns, msg)
+        # no muffleWarning: the warning keeps going to the console
+      })
+    list(result = out, warnings = unique(warns))
   }
   
   # Parallel execution setup
@@ -428,6 +455,12 @@ run_simulation <- function(p) {
   opts <- furrr::furrr_options(seed = p$seed, packages = worker_pkgs(p))
   res_h0 <- furrr::future_map(seq_len(p$Nsim), one_rep, tau = tau_H0, .options = opts)
   res_h1 <- furrr::future_map(seq_len(p$Nsim), one_rep, tau = tau_H1, .options = opts)
+  
+  # Separate the warnings from the results
+  w_h0   <- lapply(res_h0, `[[`, "warnings")
+  w_h1   <- lapply(res_h1, `[[`, "warnings")
+  res_h0 <- lapply(res_h0, `[[`, "result")
+  res_h1 <- lapply(res_h1, `[[`, "result")
   
   ok_h0 <- vapply(res_h0, is.data.frame, logical(1))
   ok_h1 <- vapply(res_h1, is.data.frame, logical(1))
@@ -457,10 +490,22 @@ run_simulation <- function(p) {
   attempts <- if (identical(p$type_adapt, "IA"))
     c(H0 = mean(r_h0$Nattempts, na.rm = TRUE), H1 = mean(r_h1$Nattempts, na.rm = TRUE)) else NULL
   
+  # Warnings: number of replications in which each message was raised
+  norm_warn <- function(x) gsub("Only +[0-9]+ +permutations", "Only k permutations", x)
+  warn_tab <- function(w, scen) {
+    u <- norm_warn(unlist(w))
+    if (!length(u)) return(NULL)
+    tb <- table(u)
+    data.frame(scenario = scen, message = names(tb), n = as.integer(tb),
+               stringsAsFactors = FALSE)
+  }
+  warnings_df <- rbind(warn_tab(w_h0, "H0"), warn_tab(w_h1, "H1"))
+  
   list(summary = summary_df, drop = drop_df, attempts = attempts,
        replications = list(H0 = r_h0, H1 = r_h1),
        params = p, tau_H1 = tau_H1, code = build_code(p, tau_H1),
-       n_failed = sum(!ok_h0) + sum(!ok_h1))
+       n_failed = sum(!ok_h0) + sum(!ok_h1),
+       warnings = warnings_df)
 }
 
 # Grouped bar chart of the % of simulations dropping each stratum (or none)
@@ -582,16 +627,20 @@ validate_params <- function(p) {
   # ---- new subjects after adaptation ----
   if (identical(p$stageII_approach, "ORIENT") && M_ok) {
     po <- p$probs_orient
-    if (!is.numeric(po) || length(po) != p$M - 1 || anyNA(po)) {
-      add(sprintf("Enter %d orientation probabilities (one per remaining alteration).", p$M - 1))
+    if (!is.matrix(po) || !is.numeric(po) || any(dim(po) != p$M) || anyNA(po)) {
+      add("All orientation probabilities in the table must be numbers.")
     } else {
-      if (any(po < 0 | po > 1)) add("Orientation probabilities must be between 0 and 1.")
-      if (abs(sum(po) - 1) > 1e-3)
-        add(sprintf("Orientation probabilities must sum to 1 (currently %.4f).", sum(po)))
+      if (any(diag(po) != 0)) add("The diagonal of the orientation probabilities table must be 0.")
+      off <- po[row(po) != col(po)]
+      if (any(off < 0 | off > 1)) add("Orientation probabilities must be between 0 and 1.")
+      # if (p$M >= 2) {
+      #   rs <- rowSums(po)
+      #   bad <- which(abs(rs - 1) > 1e-3)
+      #   if (length(bad))
+      #     add(sprintf("Each row of the orientation probabilities table must sum to 1 (check: %s).",
+      #                 paste("Alteration", bad, collapse = ", ")))
+      # }
     }
-    # to <- p$tau_off
-    # if (!is.matrix(to) || !is.numeric(to) || any(dim(to) != p$M) || anyNA(to[row(to) != col(to)]))
-    #   add("All treatment effects of the orientation table must be numbers.")
   }
   
   # ---- simulation size, seed, workers ----
@@ -699,7 +748,7 @@ ui <- page_sidebar(
         conditionalPanel(
           "input.outcome == 'survival'",
           numericInput("adapt_time", "Adaptation time (adapt_time)", value = 36, min = 0.1, step = 1),
-          helpText("Same time unit as the survival parameters (e.g. months).")
+          helpText("Same time unit as the survival parameters (e.g. months). SHould be consistent with N1.")
         ),
         radioButtons("adapt", "Type of adaptation",
                      choices = c("EXT (external event)" = "EXT",
@@ -710,7 +759,7 @@ ui <- page_sidebar(
         ),
         conditionalPanel(
           "input.adapt == 'IA'",
-          numericInput("fut_thr", "Futility threshold (z_c)", value = 0.1, step = 0.05),
+          numericInput("fut_thr", "Futility threshold (z_c)", value = 0.9, step = 0.05),
           helpText("Continuous: the stratum with the smallest standardized effect is dropped if it is <= z_c. ",
                    "Survival: the stratum with the largest Z-score for the logHR is dropped if it is > z_c.")
         )
@@ -725,14 +774,14 @@ ui <- page_sidebar(
                  "ORIENT: new subjects of the dropped alteration are enrolled and oriented to the remaining strata. Treatment effects of oriented patients are supposed to change."),
         conditionalPanel(
           "input.post == 'ORIENT'",
-          radioButtons("orient_mode", "Orientation probabilities (probs_orient, vector of M - 1 entries)",
-                       choices = c("Equal" = "equal", "Custom" = "custom"), inline = TRUE),
-          conditionalPanel(
-            "input.orient_mode == 'custom'",
-            textInput("orient_probs", "Unequal orientation probabilities",
-                      value = "", placeholder = "e.g. 0.5, 0.3, 0.2"),
-            helpText("Orientation probabilities must be written in increasing order of the remaining alterations and sum to 1.")
-          ),
+          strong("Orientation probabilities (probs_orient)"),
+          DT::DTOutput("probs_tab"),
+          div(class = "mt-2 mb-3",
+              actionButton("probs_reset", "Equal probabilities", class = "btn-sm")),
+          helpText("Rows: original alteration of the patient. Columns: stratum the patient is oriented to. ",
+                   "Each row gives the orientation probabilities used when that alteration is dropped: ",
+                   "each row must sum to 1 (or to 0 if the alteration is never dropped). ",
+                   "The diagonal is always 0 and cannot be edited."),
           strong("Treatment effect of each possible orientation under H1 (tau)"),
           DT::DTOutput("tau_tab"),
           div(class = "mt-2 mb-1",
@@ -781,6 +830,7 @@ ui <- page_sidebar(
       "Results",
       uiOutput("errors"),
       uiOutput("scenario"),
+      uiOutput("warns"),
       h5("Type I error and statistical power (nominal level alpha = 0.05)"),
       tableOutput("tab"),
       uiOutput("attempts_note")
@@ -846,6 +896,9 @@ server <- function(input, output, session) {
   # taken from the main table, so only the off-diagonal cells are stored here
   tau_off <- reactiveVal(default_tau_off(rep(0.4, 4)))
   
+  # Orientation probabilities: M x M, diagonal = 0 (not editable)
+  probs_or <- reactiveVal(default_probs_orient(4))
+  
   output$mtab <- DT::renderDT({
     DT::datatable(
       isolate(tab()), rownames = FALSE, selection = "none", class = "compact stripe",
@@ -874,6 +927,22 @@ server <- function(input, output, session) {
     m   <- tau_off()
     if (length(eff) == nrow(m))
       DT::replaceData(proxy_tau, tau_df(eff, m), resetPaging = FALSE, rownames = FALSE)
+  }
+  
+  output$probs_tab <- DT::renderDT({
+    n_alt()
+    DT::datatable(
+      isolate(probs_df(probs_or())), rownames = FALSE, selection = "none",
+      class = "compact stripe",
+      editable = list(target = "cell", disable = list(columns = 0)),
+      options = list(dom = "t", paging = FALSE, ordering = FALSE, scrollX = TRUE)
+    )
+  })
+  outputOptions(output, "probs_tab", suspendWhenHidden = FALSE)
+  proxy_probs <- DT::dataTableProxy("probs_tab")
+  
+  refresh_probs <- function() {
+    DT::replaceData(proxy_probs, probs_df(probs_or()), resetPaging = FALSE, rownames = FALSE)
   }
   
   # Replace the table (labels are renumbered, M is updated)
@@ -914,6 +983,31 @@ server <- function(input, output, session) {
     refresh_tau()
   })
   
+  # Edit of a cell of the orientation-probabilities table:
+  # the diagonal cannot be edited; the value must be a number in [0, 1]
+  observeEvent(input$probs_tab_cell_edit, {
+    info <- input$probs_tab_cell_edit
+    i <- info$row
+    j <- info$col                        # rownames = FALSE: 0 = label column, 1..M = assigned stratum
+    m <- probs_or()
+    if (j >= 1 && i != j && i <= nrow(m) && j <= ncol(m)) {
+      v <- suppressWarnings(as.numeric(info$value))
+      if (is.na(v) || v < 0 || v > 1) {
+        showNotification("Orientation probabilities must be numbers between 0 and 1 (inclusive).",
+                         type = "warning")
+      } else {
+        m[i, j] <- v
+        probs_or(m)
+      }
+    }
+    refresh_probs()
+  })
+  
+  observeEvent(input$probs_reset, {
+    probs_or(default_probs_orient(n_alt()))
+    refresh_probs()
+  })
+  
   observeEvent(input$add_row, {
     d <- tab()
     if (nrow(d) >= max_M) {
@@ -929,6 +1023,7 @@ server <- function(input, output, session) {
     m_new <- default_tau_off(d$effect)
     m_new[seq_len(M1 - 1), seq_len(M1 - 1)] <- tau_off()
     tau_off(m_new)
+    probs_or(default_probs_orient(nrow(d)))
     set_tab(d)
   })
   
@@ -939,6 +1034,7 @@ server <- function(input, output, session) {
       return()
     }
     tau_off(tau_off()[-nrow(d), -nrow(d), drop = FALSE])
+    probs_or(default_probs_orient(nrow(d) - 1L))
     set_tab(d[-nrow(d), ])
   })
   
@@ -1035,9 +1131,8 @@ server <- function(input, output, session) {
       p$max_atts <- input$max_atts
     }
     if (input$post == "ORIENT") {
-      p$probs_orient <- if (identical(input$orient_mode, "custom")) parse_probs(input$orient_probs %||% "")
-      else rep(1 / (M - 1), M - 1)
-      # p$tau_off <- tau_off()
+      pm <- probs_or()
+      p$probs_orient <- if (nrow(pm) == M) pm else matrix(NA_real_, M, M)   # transient state while M is changing
     }
     p
   })
@@ -1102,6 +1197,18 @@ server <- function(input, output, session) {
                    p$type_outcome, if (identical(p$type_outcome, "continuous")) "block randomization" else "minimization",
                    p$type_adapt, p$stageII_approach, as.integer(p$N), as.integer(p$N1), p$M,
                    as.integer(p$Nsim), as.integer(p$L)))
+  })
+  
+  # Warnings raised by simulate_one() during the simulation
+  output$warns <- renderUI({
+    r <- res()
+    if (is.null(r) || is.null(r$warnings) || !nrow(r$warnings)) return(NULL)
+    w <- r$warnings
+    div(class = "alert alert-warning",
+        strong("Warnings raised during the simulation:"),
+        tags$ul(lapply(seq_len(nrow(w)), function(i)
+          tags$li(sprintf("[%s] %s (in %d of %d replications)",
+                          w$scenario[i], w$message[i], w$n[i], r$params$Nsim)))))
   })
   
   # Type I error (with Wilson interval) and power, in %

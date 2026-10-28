@@ -142,8 +142,8 @@ my_strat_block_rand <- function(dataset_torand, trt_seq = c(1,2), prob_each = c(
 ## Arguments:
 ## * 'dataset_toorient': the dataset to orient;
 ## * 'strata_seq': vector of labels of remaining strata;
-## * 'probs_orient': vector of probabilities of assigning a subject to each stratum.
-my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient){
+## * 'probs_orient_vec': vector of probabilities of assigning a subject to each stratum.
+my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient_vec){
   
   # controls
   if(!is.data.frame(dataset_toorient))
@@ -152,12 +152,12 @@ my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient)
     stop("dataset_toorient must contain at least one subject", call. = FALSE)
   if(length(strata_seq) < 1 || anyNA(strata_seq) || anyDuplicated(strata_seq) > 0)
     stop("strata_seq must contain at least 1 distinct, non-missing label", call. = FALSE)
-  if(length(probs_orient) != length(strata_seq) || !is.numeric(probs_orient) || 
-      any(!is.finite(probs_orient)) || any(probs_orient < 0) || any(probs_orient > 1))
-    stop(paste0("probs_orient must be a numeric vector of ", length(strata_seq),
+  if(length(probs_orient_vec) != length(strata_seq) || !is.numeric(probs_orient_vec) || 
+      any(!is.finite(probs_orient_vec)) || any(probs_orient_vec < 0) || any(probs_orient_vec > 1))
+    stop(paste0("probs_orient_vec must be a numeric vector of ", length(strata_seq),
                 " probabilities"), call. = FALSE)
-  if(abs(sum(probs_orient) - 1) > 1e-3)
-    stop(paste0("probs_orient must sum to 1 (current sum: ", sum(probs_orient), ")"), 
+  if(abs(sum(probs_orient_vec) - 1) > 1e-3)
+    stop(paste0("probs_orient_vec must sum to 1 (current sum: ", sum(probs_orient_vec), ")"), 
          call. = FALSE)
   
   
@@ -179,7 +179,7 @@ my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient)
     block_assign <- c(block_assign, rep(n_complete_blocks + 1, n_remaining))
   }
   
-  # for each block assign patients to strata based on 'probs_orient' 
+  # for each block assign patients to strata based on 'probs_orient_vec' 
   block_ID <- unique(block_assign) 
   stratum_assign <- numeric(n_tot)
   
@@ -187,14 +187,14 @@ my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient)
     block_j <- which(block_assign == j)
     n_block_j <- length(block_j)
     
-    n_each_stratum <- floor(n_block_j * probs_orient) 
+    n_each_stratum <- floor(n_block_j * probs_orient_vec) 
     n_assigned <- sum(n_each_stratum)
     n_remainder <- n_block_j - n_assigned
     
     if(n_remainder > 0){
-      probs_orient_fixed <- ((probs_orient * n_block_j) - n_each_stratum)/n_remainder
+      probs_orient_vec_fixed <- ((probs_orient_vec * n_block_j) - n_each_stratum)/n_remainder
       block_stratum <- c(rep(strata_seq, n_each_stratum),
-                         sample(strata_seq, n_remainder, prob = probs_orient_fixed, 
+                         sample(strata_seq, n_remainder, prob = probs_orient_vec_fixed, 
                                 replace = F))
     } 
     else{
@@ -232,9 +232,11 @@ my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient)
 ## * 'bs': size of blocks patients are assigned into by the stratified block randomization;
 ## * 'alpha': control effect;
 ## * 'sigma': vector of alteration-specific prognostic effects;
-## * 'tau': matrix of alteration*stratum-specific treatment effects;
+## * 'tau': matrix of alteration*stratum-specific (row*column) treatment effects;
 ## * 'drop_trt': molecular alteration to be dropped in the 'EXT' scenario;
 ## * 'z_c': futility threshold to be used in the 'IA' scenario';
+## * 'probs_orient': matrix of probabilities of orienting a subject belonging to
+## a specific molecular alteration (row) to a new stratum (column). The diagonal must contain all 0;
 ## * the other parameters are described in the previous functions.
 data_generation_cont <- function(type_adapt, stageII_approach, 
                                  N, N1, M, prevalence, trt_labels, probs, bs, 
@@ -308,12 +310,13 @@ data_generation_cont <- function(type_adapt, stageII_approach,
   }
   else if((type_adapt=="EXT" & stageII_approach=="ORIENT") | 
           (type_adapt=="IA" & stageII_approach=="ORIENT" & drop_trt!=0)){ 
+    probs_orient_vec <- probs_orient[drop_trt, -drop_trt]
     data2_maintain <- data2[data2$stratum_orig!=drop_trt,]
     data2_maintain$stratum_assign <- data2_maintain$stratum_orig
     data2_toorient <- data2[data2$stratum_orig==drop_trt,]
     # orientation of patients belonging to the dropped stratum (block randomization)
     data2_oriented <- my_block_rand(dataset_toorient = data2_toorient, strata_seq = setdiff(1:M, drop_trt), 
-                                    probs_orient)
+                                    probs_orient_vec)
     data2_toassign <- rbind(data2_maintain,data2_oriented)
   }
   data2_toassign <- data2_toassign[order(data2_toassign$ID), ]
@@ -459,12 +462,13 @@ data_generation_surv <- function(type_adapt, stageII_approach,
   }
   if((type_adapt=="EXT" & stageII_approach=="ORIENT") | 
      (type_adapt=="IA" & stageII_approach=="ORIENT" & drop_trt!=0)){
+    probs_orient_vec <- probs_orient[drop_trt, -drop_trt]
     data2_maintain <- data2_pre[data2_pre$stratum_orig!=drop_trt,]
     data2_maintain$stratum_assign <- data2_maintain$stratum_orig
     data2_toorient <- data2_pre[data2_pre$stratum_orig==drop_trt,]
     # orientation of patients belonging to the dropped stratum (block randomization)
     data2_oriented <- my_block_rand(dataset_toorient = data2_toorient, strata_seq = setdiff(1:M, drop_trt),
-                                    probs_orient)
+                                    probs_orient_vec)
     data2 <- rbind(data2_maintain,data2_oriented)
   }
   data2 <- data2[order(data2$ID), ]
@@ -929,17 +933,14 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
     new_ctrl_label <- new_trt_labels[1]
     new_trt_label <- new_trt_labels[2]
     new_M <- length(unique(new_dataset1$stratum_assign))
-    new_stddiff <- sapply(1:new_M, function(s_assign){
-      new_stratum_ctrl <- new_dataset1[new_dataset1$stratum_assign == s_assign & 
+    new_stddiff <- sapply(1:new_M, function(new_s_assign) {
+      new_stratum_ctrl <- new_dataset1[new_dataset1$stratum_assign == new_s_assign & 
                                          new_dataset1$trt == new_ctrl_label, ]
-      new_stratum_trt <- new_dataset1[new_dataset1$stratum_assign == s_assign & 
+      new_stratum_trt <- new_dataset1[new_dataset1$stratum_assign == new_s_assign & 
                                         new_dataset1$trt == new_trt_label, ]
       new_mean_diff <- mean(new_stratum_trt$y) - mean(new_stratum_ctrl$y)
-      new_sd_pooled <- sqrt(((nrow(new_stratum_trt)-1)*var(new_stratum_trt$y) +
-                               (nrow(new_stratum_ctrl)-1)*var(new_stratum_ctrl$y))/
-                              (nrow(new_stratum_trt)+nrow(new_stratum_ctrl)-2))
-      new_denom <- new_sd_pooled*(1/nrow(new_stratum_trt)+1/nrow(new_stratum_ctrl))
-      return(new_mean_diff / new_denom)
+      new_sd_ctrl <- sd(new_stratum_ctrl$y) # extension required for different variances (heteroschedasticity)
+      return(new_mean_diff / new_sd_ctrl)
     })
     
     new_min_diff <- min(new_stddiff)
@@ -1372,7 +1373,7 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
           covmat = covmat_tot,
           j = j,
           covwt = rep(1,ncol(covmat_tot)),
-          ratio = rep(1,length(trt_labels)),
+          ratio = probs,
           ntrt = length(trt_labels),
           trtseq = trt_labels,
           method = "Range",
@@ -1586,7 +1587,7 @@ simulate_one <- function(type_outcome = "continuous",
     if(!is.null(bs))
       stop("If type_rand = 'minim', bs must be NULL", call. = FALSE)
     if(length(p_min) != 1 || !is.numeric(p_min) || !is.finite(p_min) ||
-       p_min < 0.5 || p_min >= 1)
+       p_min <= 0.5 || p_min >= 1)
       stop("p_min must be a number (probability) strictly between 0.5 and 1", call. = FALSE)
     if(length(probX) != 1 || !is.numeric(probX) || !is.finite(probX) ||
        probX <= 0 || probX >= 1)
@@ -1625,13 +1626,13 @@ simulate_one <- function(type_outcome = "continuous",
       stop("If stageII_approach = 'DROP', probs_orient must be NULL", call. = FALSE)
   }
   if(stageII_approach == "ORIENT"){
-    if(!is.numeric(probs_orient) || length(probs_orient) != M - 1 ||
-       any(!is.finite(probs_orient)) || any(probs_orient < 0) || any(probs_orient > 1))
-      stop(paste0("probs_orient must be a numeric vector of M-1 = ", M - 1,
-                  " probabilities"), call. = FALSE)
-    if(abs(sum(probs_orient) - 1) > 1e-3)
-      stop(paste0("probs_orient must sum to 1 (current sum: ", sum(probs_orient), ")"),
+    if(!is.matrix(probs_orient) || !is.numeric(probs_orient) || nrow(probs_orient) != M || 
+        ncol(probs_orient) != M || any(!is.finite(probs_orient)) || any(probs_orient < 0) || 
+        any(probs_orient > 1))
+      stop(paste0("probs_orient must be a ", M, "x", M," numeric matrix of probabilities"),
            call. = FALSE)
+    if(any(diag(probs_orient) != 0))
+      stop("probs_orient must have zeros on the diagonal", call. = FALSE)
   }
   
   if(!is.numeric(prevalence) || length(prevalence) != M ||
@@ -2003,13 +2004,12 @@ simulate_one <- function(type_outcome = "continuous",
 
 ## Parallelization
 future::availableCores() # check the number of available cores 
-plan(multisession, workers = future::availableCores()-2)
+plan(multisession, workers = 10)
 
 ## Running simulation studies
 seed <- 234
-Ntrials <- 10000
-Nperms <- 1000
-Natts <- 100000
+Ntrials <- 10
+Nperms <- 1
 
 # CONTINUOUS OUTCOMES
 
@@ -2083,7 +2083,12 @@ rslt_cont_EXT_ORIENT_H0 <- furrr::future_map(1:Ntrials, ~{
                               0,0,0,0,
                               0,0,0,0,
                               0,0,0,0), nrow = 4, ncol = 4, byrow = TRUE), 
-               drop_trt = 4, z_c = NULL, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = NULL) %>%
+               drop_trt = 4, z_c = NULL, 
+               probs_orient = matrix(c(0,0,0,0,
+                                       0,0,0,0,
+                                       0,0,0,0,
+                                       1/3,1/3,1/3,0), nrow = 4, ncol = 4, byrow = TRUE), 
+               L = Nperms, max_atts = NULL) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_cont_EXT_ORIENT_H0_df <- list_rbind(rslt_cont_EXT_ORIENT_H0)
@@ -2120,7 +2125,12 @@ rslt_cont_EXT_ORIENT_H1 <- furrr::future_map(1:Ntrials, ~{
                               0,0.4,0,0,
                               0,0,0.4,0,
                               0.4,0.4,0.4,0.4), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = 4, z_c = NULL, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = NULL) %>%
+               drop_trt = 4, z_c = NULL, 
+               probs_orient = matrix(c(0,0,0,0,
+                                       0,0,0,0,
+                                       0,0,0,0,
+                                       1/3,1/3,1/3,0), nrow = 4, ncol = 4, byrow = TRUE),
+               L = Nperms, max_atts = NULL) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_cont_EXT_ORIENT_H1_df <- list_rbind(rslt_cont_EXT_ORIENT_H1)
@@ -2144,6 +2154,7 @@ print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_EXT_ORIENT
               ((Ntrials-sum(rslt_cont_EXT_ORIENT_H1_df$F3_nullWALD, na.rm = T))*Nperms)*100, "%"))
 
 # Scenario IA-DROP
+Natts <- 100000
 # H0
 rslt_cont_IA_DROP_H0 <- furrr::future_map(1:Ntrials, ~{
   simulate_one(type_outcome = "continuous",
@@ -2221,7 +2232,12 @@ rslt_cont_IA_ORIENT_H0 <- furrr::future_map(1:Ntrials, ~{
                               0,0,0,0,
                               0,0,0,0,
                               0,0,0,0), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = NULL, z_c = -0.84, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = Natts) %>%
+               drop_trt = NULL, z_c = 0, 
+               probs_orient = matrix(c(0,1/3,1/3,1/3,
+                                       1/3,0,1/3,1/3,
+                                       1/3,1/3,0,1/3,
+                                       1/3,1/3,1/3,0), nrow = 4, ncol = 4, byrow = TRUE),
+               L = Nperms, max_atts = Natts) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_cont_IA_ORIENT_H0_df <- list_rbind(rslt_cont_IA_ORIENT_H0)
@@ -2262,7 +2278,12 @@ rslt_cont_IA_ORIENT_H1 <- furrr::future_map(1:Ntrials, ~{
                               0,0.4,0,0,
                               0,0,0.4,0,
                               0.4,0.4,0.4,-0.4), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = NULL, z_c = -0.84, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = Natts) %>%
+               drop_trt = NULL, z_c = 0, 
+               probs_orient = matrix(c(0,1/3,1/3,1/3,
+                                       1/3,0,1/3,1/3,
+                                       1/3,1/3,0,1/3,
+                                       1/3,1/3,1/3,0), nrow = 4, ncol = 4, byrow = TRUE),
+               L = Nperms, max_atts = Natts) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_cont_IA_ORIENT_H1_df <- list_rbind(rslt_cont_IA_ORIENT_H1)
@@ -2291,8 +2312,7 @@ print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_IA_ORIENT_
 
 
 # SURVIVAL OUTCOMES
-seed = 1234
-      
+
 # Scenario EXT-DROP
 # H0
 rslt_surv_EXT_DROP_H0 <- furrr::future_map(1:Ntrials, ~{
@@ -2371,7 +2391,12 @@ rslt_surv_EXT_ORIENT_H0 <- furrr::future_map(1:Ntrials, ~{
                               0,0,0,0,
                               0,0,0,0,
                               0,0,0,0), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = 4, z_c = NULL, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = NULL) %>%
+               drop_trt = 4, z_c = NULL, 
+               probs_orient = matrix(c(0,0,0,0,
+                                       0,0,0,0,
+                                       0,0,0,0,
+                                       1/3,1/3,1/3,0), nrow = 4, ncol = 4, byrow = TRUE),
+               L = Nperms, max_atts = NULL) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_surv_EXT_ORIENT_H0_df <- list_rbind(rslt_surv_EXT_ORIENT_H0)
@@ -2395,14 +2420,19 @@ print(paste("Convergence issues in permutations:", sum(rslt_surv_EXT_ORIENT_H0_d
 #                type_adapt = "EXT",
 #                stageII_approach = "ORIENT",
 #                N = 200, N1 = 100, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_labels = c(1,2),
-#                probs = c(0.5,0.5), bs = NULL, p_min = 0.9, adapt_time = 36, Tr = 72, 
-#                Ts = 84, delta = 0.01, alpha = NULL, lambda0 = log(2)/4, sigma = c(0.5,0.5,0.5,0.5), 
+#                probs = c(0.5,0.5), bs = NULL, p_min = 0.9, adapt_time = 36, Tr = 72,
+#                Ts = 84, delta = 0.01, alpha = NULL, lambda0 = log(2)/4, sigma = c(0.5,0.5,0.5,0.5),
 #                coefX = 0.3, probX = 0.4,
 #                tau = matrix(c(-0.4,0,0,0,
 #                               0,-0.4,0,0,
 #                               0,0,-0.4,0,
 #                               -0.4,-0.4,-0.4,-0.4), nrow = 4, ncol = 4, byrow = TRUE),
-#                drop_trt = 4, z_c = NULL, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = NULL) %>%
+#                drop_trt = 4, z_c = NULL, 
+#                probs_orient = matrix(c(0,0,0,0,
+#                                        0,0,0,0,
+#                                        0,0,0,0,
+#                                        1/3,1/3,1/3,0), nrow = 4, ncol = 4, byrow = TRUE), 
+#                L = Nperms, max_atts = NULL) %>%
 #     mutate(sim=.x)
 # }, .progress = TRUE, .options = furrr_options(seed = seed))
 # rslt_surv_EXT_ORIENT_H1_df <- list_rbind(rslt_surv_EXT_ORIENT_H1)
@@ -2411,12 +2441,12 @@ print(paste("Convergence issues in permutations:", sum(rslt_surv_EXT_ORIENT_H0_d
 # print(paste("Asymptotic unadjusted score test:", (1-table(rslt_surv_EXT_ORIENT_H1_df$rejects_unadj_asympt)["0"]/Ntrials)*100, "%"))
 # print(paste("Randomization unadjusted score test:", (1-table(rslt_surv_EXT_ORIENT_H1_df$rejects_unadj_rand)["0"]/Ntrials)*100, "%"))
 # print(paste("Asymptotic adjusted score test:", (1-table(rslt_surv_EXT_ORIENT_H1_df$rejects_adj_asympt)["0"]/Ntrials)*100, "%"))
-# print(paste("Convergence issues in asymptotic:", sum(rslt_surv_EXT_ORIENT_H1_df$conv_issue_asympt == 1 | 
+# print(paste("Convergence issues in asymptotic:", sum(rslt_surv_EXT_ORIENT_H1_df$conv_issue_asympt == 1 |
 #                                                        rslt_surv_EXT_ORIENT_H1_df$na_issue_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
 # print(paste("Randomization unadjusted score test:", (1-table(rslt_surv_EXT_ORIENT_H1_df$rejects_adj_rand)["0"]/Ntrials)*100, "%"))
-# print(paste("Convergence issues in permutations:", sum(rslt_surv_EXT_ORIENT_H1_df$conv_issues_rand == 1 | 
+# print(paste("Convergence issues in permutations:", sum(rslt_surv_EXT_ORIENT_H1_df$conv_issues_rand == 1 |
 #                                                          rslt_surv_EXT_ORIENT_H1_df$na_issues_rand == 1, na.rm = TRUE)/
-#               ((Ntrials-sum(rslt_surv_EXT_ORIENT_H1_df$conv_issue_asympt == 1 | 
+#               ((Ntrials-sum(rslt_surv_EXT_ORIENT_H1_df$conv_issue_asympt == 1 |
 #                               rslt_surv_EXT_ORIENT_H1_df$na_issue_asympt == 1, na.rm = TRUE))*Nperms)*100, "%"))
 
 # Scenario IA-DROP
@@ -2434,7 +2464,7 @@ rslt_surv_IA_DROP_H0 <- furrr::future_map(1:Ntrials, ~{
                               0,0,0,0,
                               0,0,0,0,
                               0,0,0,0), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = NULL, z_c = 0.9, probs_orient = NULL, L = Nperms, max_atts = Natts) %>%
+               drop_trt = NULL, z_c = -0.84, probs_orient = NULL, L = Nperms, max_atts = Natts) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_surv_IA_DROP_H0_df <- list_rbind(rslt_surv_IA_DROP_H0)
@@ -2469,7 +2499,7 @@ print(paste("Convergence issues in permutations:", sum(rslt_surv_IA_DROP_H0_df$c
 #                               0,-0.4,0,0,
 #                               0,0,-0.4,0,
 #                               0,0,0,0.4), nrow = 4, ncol = 4, byrow = TRUE),
-#                drop_trt = NULL, z_c = 0.9, probs_orient = NULL, L = Nperms, max_atts = Natts) %>%
+#                drop_trt = NULL, z_c = -0.84, probs_orient = NULL, L = Nperms, max_atts = Natts) %>%
 #     mutate(sim=.x)
 # }, .progress = TRUE, .options = furrr_options(seed = seed))
 # rslt_surv_IA_DROP_H1_df <- list_rbind(rslt_surv_IA_DROP_H1)
@@ -2505,7 +2535,12 @@ rslt_surv_IA_ORIENT_H0 <- furrr::future_map(1:Ntrials, ~{
                               0,0,0,0,
                               0,0,0,0,
                               0,0,0,0), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = NULL, z_c = 0.9, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = Natts) %>%
+               drop_trt = NULL, z_c = 0, 
+               probs_orient = matrix(c(0,1/3,1/3,1/3,
+                                       1/3,0,1/3,1/3,
+                                       1/3,1/3,0,1/3,
+                                       1/3,1/3,1/3,0), nrow = 4, ncol = 4, byrow = TRUE), 
+               L = Nperms, max_atts = Natts) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_surv_IA_ORIENT_H0_df <- list_rbind(rslt_surv_IA_ORIENT_H0)
@@ -2533,14 +2568,19 @@ print(paste("Convergence issues in permutations:", sum(rslt_surv_IA_ORIENT_H0_df
 #                type_adapt = "IA",
 #                stageII_approach = "ORIENT",
 #                N = 200, N1 = 100, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_labels = c(1,2),
-#                probs = c(0.5,0.5), bs = NULL, p_min = 0.9, adapt_time = 36, Tr = 72, 
-#                Ts = 84, delta = 0.01, alpha = NULL, lambda0 = log(2)/4, sigma = c(0.5,0.5,0.5,0.5), 
+#                probs = c(0.5,0.5), bs = NULL, p_min = 0.9, adapt_time = 36, Tr = 72,
+#                Ts = 84, delta = 0.01, alpha = NULL, lambda0 = log(2)/4, sigma = c(0.5,0.5,0.5,0.5),
 #                coefX = 0.3, probX = 0.4,
 #                tau = matrix(c(-0.4,0,0,0,
 #                               0,-0.4,0,0,
 #                               0,0,-0.4,0,
 #                               -0.4,-0.4,-0.4,0.4), nrow = 4, ncol = 4, byrow = TRUE),
-#                drop_trt = NULL, z_c = 0.9, probs_orient = c(1/3,1/3,1/3), L = Nperms, max_atts = Natts) %>%
+#                drop_trt = NULL, z_c = 0, 
+#                probs_orient = matrix(c(0,1/3,1/3,1/3,
+#                                        1/3,0,1/3,1/3,
+#                                        1/3,1/3,0,1/3,
+#                                        1/3,1/3,1/3,0), nrow = 4, ncol = 4, byrow = TRUE), 
+#                L = Nperms, max_atts = Natts) %>%
 #     mutate(sim=.x)
 # }, .progress = TRUE, .options = furrr_options(seed = seed))
 # rslt_surv_IA_ORIENT_H1_df <- list_rbind(rslt_surv_IA_ORIENT_H1)
@@ -2553,12 +2593,12 @@ print(paste("Convergence issues in permutations:", sum(rslt_surv_IA_ORIENT_H0_df
 # print(paste("Mean number of attempts in randomizations:", mean(rslt_surv_IA_ORIENT_H1_df$Nattempts, na.rm = T)))
 # print(paste("Randomization unadjusted score test:", (1-table(rslt_surv_IA_ORIENT_H1_df$rejects_unadj_rand)["0"]/Ntrials)*100, "%"))
 # print(paste("Asymptotic adjusted score test:", (1-table(rslt_surv_IA_ORIENT_H1_df$rejects_adj_asympt)["0"]/Ntrials)*100, "%"))
-# print(paste("Convergence issues in asymptotic:", sum(rslt_surv_IA_ORIENT_H1_df$conv_issue_asympt == 1 | 
+# print(paste("Convergence issues in asymptotic:", sum(rslt_surv_IA_ORIENT_H1_df$conv_issue_asympt == 1 |
 #                                                        rslt_surv_IA_ORIENT_H1_df$na_issue_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
 # print(paste("Randomization unadjusted score test:", (1-table(rslt_surv_IA_ORIENT_H1_df$rejects_adj_rand)["0"]/Ntrials)*100, "%"))
-# print(paste("Convergence issues in permutations:", sum(rslt_surv_IA_ORIENT_H1_df$conv_issues_rand == 1 | 
+# print(paste("Convergence issues in permutations:", sum(rslt_surv_IA_ORIENT_H1_df$conv_issues_rand == 1 |
 #                                                          rslt_surv_IA_ORIENT_H1_df$na_issues_rand == 1, na.rm = TRUE)/
-#               ((Ntrials-sum(rslt_surv_IA_ORIENT_H1_df$conv_issue_asympt == 1 | 
+#               ((Ntrials-sum(rslt_surv_IA_ORIENT_H1_df$conv_issue_asympt == 1 |
 #                               rslt_surv_IA_ORIENT_H1_df$na_issue_asympt == 1, na.rm = TRUE))*Nperms)*100, "%"))
 
 

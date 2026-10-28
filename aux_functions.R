@@ -27,7 +27,7 @@ my_strat_block_rand <- function(dataset_torand, trt_seq = c(1,2), prob_each = c(
       any(!is.finite(prob_each)) || any(prob_each < 0) || any(prob_each > 1))
     stop(paste0("prob_each must be a numeric vector of ", length(trt_seq), " probabilities"), 
          call. = FALSE)
-  if(abs(sum(prob_each) - 1) > 1e-8)
+  if(abs(sum(prob_each) - 1) > 1e-3)
     stop(paste0("prob_each must sum to 1 (current sum: ", sum(prob_each), ")"), call. = FALSE)
   if(length(blocksize) != 1 || !is.numeric(blocksize) || !is.finite(blocksize) ||
      blocksize != round(blocksize) || blocksize < 1)
@@ -109,22 +109,22 @@ my_strat_block_rand <- function(dataset_torand, trt_seq = c(1,2), prob_each = c(
 ## Arguments:
 ## * 'dataset_toorient': the dataset to orient;
 ## * 'strata_seq': vector of labels of remaining strata;
-## * 'probs_orient': vector of probabilities of assigning a subject to each stratum.
-my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient) {
+## * 'probs_orient_vec': vector of probabilities of assigning a subject to each stratum.
+my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient_vec){
   
   # controls
-  if (!is.data.frame(dataset_toorient))
+  if(!is.data.frame(dataset_toorient))
     stop("dataset_toorient must be a data.frame", call. = FALSE)
-  if (nrow(dataset_toorient) == 0)
+  if(nrow(dataset_toorient) == 0)
     stop("dataset_toorient must contain at least one subject", call. = FALSE)
-  if (length(strata_seq) < 1 || anyNA(strata_seq) || anyDuplicated(strata_seq) > 0)
+  if(length(strata_seq) < 1 || anyNA(strata_seq) || anyDuplicated(strata_seq) > 0)
     stop("strata_seq must contain at least 1 distinct, non-missing label", call. = FALSE)
-  if (length(probs_orient) != length(strata_seq) || !is.numeric(probs_orient) || 
-      any(!is.finite(probs_orient)) || any(probs_orient < 0) || any(probs_orient > 1))
-    stop(paste0("probs_orient must be a numeric vector of ", length(strata_seq),
+  if(length(probs_orient_vec) != length(strata_seq) || !is.numeric(probs_orient_vec) || 
+     any(!is.finite(probs_orient_vec)) || any(probs_orient_vec < 0) || any(probs_orient_vec > 1))
+    stop(paste0("probs_orient_vec must be a numeric vector of ", length(strata_seq),
                 " probabilities"), call. = FALSE)
-  if(abs(sum(probs_orient) - 1) > 1e-8)
-    stop(paste0("probs_orient must sum to 1 (current sum: ", sum(probs_orient), ")"), 
+  if(abs(sum(probs_orient_vec) - 1) > 1e-3)
+    stop(paste0("probs_orient_vec must sum to 1 (current sum: ", sum(probs_orient_vec), ")"), 
          call. = FALSE)
   
   
@@ -139,14 +139,14 @@ my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient)
   n_remaining <- n_tot %% blocksize
   
   block_assign <- c()
-  if (n_complete_blocks > 0) {
+  if(n_complete_blocks > 0){
     block_assign <- rep(1:n_complete_blocks, each = blocksize)
   }
-  if (n_remaining > 0) {
+  if(n_remaining > 0){
     block_assign <- c(block_assign, rep(n_complete_blocks + 1, n_remaining))
   }
   
-  # for each block assign patients to strata based on 'probs_orient' 
+  # for each block assign patients to strata based on 'probs_orient_vec' 
   block_ID <- unique(block_assign) 
   stratum_assign <- numeric(n_tot)
   
@@ -154,14 +154,14 @@ my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient)
     block_j <- which(block_assign == j)
     n_block_j <- length(block_j)
     
-    n_each_stratum <- floor(n_block_j * probs_orient) 
+    n_each_stratum <- floor(n_block_j * probs_orient_vec) 
     n_assigned <- sum(n_each_stratum)
     n_remainder <- n_block_j - n_assigned
     
-    if (n_remainder > 0) {
-      probs_orient_fixed <- ((probs_orient * n_block_j) - n_each_stratum)/n_remainder
+    if(n_remainder > 0){
+      probs_orient_vec_fixed <- ((probs_orient_vec * n_block_j) - n_each_stratum)/n_remainder
       block_stratum <- c(rep(strata_seq, n_each_stratum),
-                         sample(strata_seq, n_remainder, prob = probs_orient_fixed, 
+                         sample(strata_seq, n_remainder, prob = probs_orient_vec_fixed, 
                                 replace = F))
     } 
     else{
@@ -199,9 +199,11 @@ my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient)
 ## * 'bs': size of blocks patients are assigned into by the stratified block randomization;
 ## * 'alpha': control effect;
 ## * 'sigma': vector of alteration-specific prognostic effects;
-## * 'tau': matrix of alteration*stratum-specific treatment effects;
+## * 'tau': matrix of alteration*stratum-specific (row*column) treatment effects;
 ## * 'drop_trt': molecular alteration to be dropped in the 'EXT' scenario;
 ## * 'z_c': futility threshold to be used in the 'IA' scenario';
+## * 'probs_orient': matrix of probabilities of orienting a subject belonging to
+## a specific molecular alteration (row) to a new stratum (column). The diagonal must contain all 0;
 ## * the other parameters are described in the previous functions.
 data_generation_cont <- function(type_adapt, stageII_approach, 
                                  N, N1, M, prevalence, trt_labels, probs, bs, 
@@ -275,12 +277,13 @@ data_generation_cont <- function(type_adapt, stageII_approach,
   }
   else if((type_adapt=="EXT" & stageII_approach=="ORIENT") | 
           (type_adapt=="IA" & stageII_approach=="ORIENT" & drop_trt!=0)){ 
+    probs_orient_vec <- probs_orient[drop_trt, -drop_trt]
     data2_maintain <- data2[data2$stratum_orig!=drop_trt,]
     data2_maintain$stratum_assign <- data2_maintain$stratum_orig
     data2_toorient <- data2[data2$stratum_orig==drop_trt,]
     # orientation of patients belonging to the dropped stratum (block randomization)
     data2_oriented <- my_block_rand(dataset_toorient = data2_toorient, strata_seq = setdiff(1:M, drop_trt), 
-                                    probs_orient)
+                                    probs_orient_vec)
     data2_toassign <- rbind(data2_maintain,data2_oriented)
   }
   data2_toassign <- data2_toassign[order(data2_toassign$ID), ]
@@ -426,12 +429,13 @@ data_generation_surv <- function(type_adapt, stageII_approach,
   }
   if((type_adapt=="EXT" & stageII_approach=="ORIENT") | 
      (type_adapt=="IA" & stageII_approach=="ORIENT" & drop_trt!=0)){
+    probs_orient_vec <- probs_orient[drop_trt, -drop_trt]
     data2_maintain <- data2_pre[data2_pre$stratum_orig!=drop_trt,]
     data2_maintain$stratum_assign <- data2_maintain$stratum_orig
     data2_toorient <- data2_pre[data2_pre$stratum_orig==drop_trt,]
     # orientation of patients belonging to the dropped stratum (block randomization)
     data2_oriented <- my_block_rand(dataset_toorient = data2_toorient, strata_seq = setdiff(1:M, drop_trt),
-                                    probs_orient)
+                                    probs_orient_vec)
     data2 <- rbind(data2_maintain,data2_oriented)
   }
   data2 <- data2[order(data2$ID), ]
@@ -1495,6 +1499,8 @@ simulate_one <- function(type_outcome = "continuous",
   # controls
   if (length(N) != 1 || !is.numeric(N) || !is.finite(N) || N != round(N) || N <= 0)
     stop("N must be a finite and positive integer", call. = FALSE)
+  if(length(N1) != 1 || !is.numeric(N1) || !is.finite(N1) || N1 != round(N1) || N1 <= 0 || N1 >= N)
+    stop(paste0("N1 must be a finite and positive integer lower than N =", N), call. = FALSE)
   if (length(M) != 1 || !is.numeric(M) || !is.finite(M) || M != round(M) || M <= 0)
     stop("M must be a finite and positive integer", call. = FALSE)
   if (length(L) != 1 || !is.numeric(L) || !is.finite(L) || L != round(L) || L <= 0)
@@ -1587,20 +1593,20 @@ simulate_one <- function(type_outcome = "continuous",
       stop("If stageII_approach = 'DROP', probs_orient must be NULL", call. = FALSE)
   }
   if(stageII_approach == "ORIENT"){
-    if(!is.numeric(probs_orient) || length(probs_orient) != M - 1 ||
-       any(!is.finite(probs_orient)) || any(probs_orient < 0) || any(probs_orient > 1))
-      stop(paste0("probs_orient must be a numeric vector of M-1 = ", M - 1,
-                  " probabilities"), call. = FALSE)
-    if(abs(sum(probs_orient) - 1) > 1e-8)
-      stop(paste0("probs_orient must sum to 1 (current sum: ", sum(probs_orient), ")"),
+    if(!is.matrix(probs_orient) || !is.numeric(probs_orient) || nrow(probs_orient) != M || 
+       ncol(probs_orient) != M || any(!is.finite(probs_orient)) || any(probs_orient < 0) || 
+       any(probs_orient > 1))
+      stop(paste0("probs_orient must be a ", M, "x", M," numeric matrix of probabilities"),
            call. = FALSE)
+    if(any(diag(probs_orient) != 0))
+      stop("probs_orient must have zeros on the diagonal", call. = FALSE)
   }
   
   if(!is.numeric(prevalence) || length(prevalence) != M ||
      any(!is.finite(prevalence)) || any(prevalence < 0) || any(prevalence > 1))
     stop(paste0("prevalence must be a numeric vector of M = ", M,
                 " probabilities"), call. = FALSE)
-  if (abs(sum(prevalence) - 1) > 1e-8)
+  if (abs(sum(prevalence) - 1) > 1e-3)
     stop(paste0("prevalence must sum to 1 (current sum: ", sum(prevalence), ")"),
          call. = FALSE)
   if(length(trt_labels) != 2 || anyNA(trt_labels) || anyDuplicated(trt_labels) > 0)
@@ -1615,7 +1621,7 @@ simulate_one <- function(type_outcome = "continuous",
   if(!is.numeric(probs) || length(probs) != 2 ||
      any(!is.finite(probs)) || any(probs < 0) || any(probs > 1))
     stop("probs must be a numeric vector of 2 probabilities", call. = FALSE)
-  if(abs(sum(probs) - 1) > 1e-8)
+  if(abs(sum(probs) - 1) > 1e-3)
     stop(paste0("probs must sum to 1 (current sum: ", sum(probs), ")"), call. = FALSE)
   if(!is.numeric(sigma) || length(sigma) != M || any(!is.finite(sigma)))
     stop(paste0("sigma must be a numeric vector of M = ", M, " finite values"), call. = FALSE)
