@@ -1111,7 +1111,7 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
       data_analysis[[paste0("int", new_K)]] <- new_int_ref
       # new_int_names <- c(new_int_names, paste0("int", new_K))
       new_int_ref_name <- paste0("int", new_K)
-      for (new_k in 1:(new_K - 1)) {
+      for (new_k in seq_len(new_K - 1)) {
         new_s_k <- new_strata_levels[new_k]
         new_w_k <- as.numeric(new_weights[new_s_k])
         new_int_k_name <- paste0("int", new_k)
@@ -1123,14 +1123,10 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
         new_z_names <- c(new_z_names, new_z_k_name)
       }
       # new_int_names <- sort(new_int_names)
-      new_formule_red <- as.formula(
-        paste("Surv(t_event, event) ~ stratum_assign_f +", 
-              paste(new_z_names, collapse = " + "), "+ covX_f")
-      )
-      new_formule_full <- as.formula(
-        paste("Surv(t_event, event) ~ stratum_assign_f +", 
-              paste(new_z_names, collapse = " + "), "+ covX_f +", new_int_ref_name)
-      )
+      new_strat_term <- if (new_K >= 2) "stratum_assign_f +" else ""
+      new_z_term <- if (length(new_z_names) > 0) paste(paste(new_z_names, collapse = " + "), "+") else ""
+      new_formule_red <- as.formula(paste("Surv(t_event, event) ~", new_strat_term, new_z_term, "covX_f"))
+      new_formule_full <- as.formula(paste("Surv(t_event, event) ~", new_strat_term, new_z_term, "covX_f +", new_int_ref_name))
       
       conv_perm <- FALSE
       na_perm   <- FALSE
@@ -1384,7 +1380,7 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
         data_analysis[[paste0("int", new_K)]] <- new_int_ref
         # new_int_names <- c(new_int_names, paste0("int", new_K))
         new_int_ref_name <- paste0("int", new_K)
-        for (new_k in 1:(new_K - 1)) {
+        for (new_k in seq_len(new_K - 1)) {
           new_s_k <- new_strata_levels[new_k]
           new_w_k <- as.numeric(new_weights[new_s_k])
           new_int_k_name <- paste0("int", new_k)
@@ -1396,14 +1392,10 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
           new_z_names <- c(new_z_names, new_z_k_name)
         }
         # new_int_names <- sort(new_int_names)
-        new_formule_red <- as.formula(
-          paste("Surv(t_event, event) ~ stratum_assign_f +", 
-                paste(new_z_names, collapse = " + "), "+ covX_f")
-        )
-        new_formule_full <- as.formula(
-          paste("Surv(t_event, event) ~ stratum_assign_f +", 
-                paste(new_z_names, collapse = " + "), "+ covX_f +", new_int_ref_name)
-        )
+        new_strat_term <- if (new_K >= 2) "stratum_assign_f +" else ""
+        new_z_term <- if (length(new_z_names) > 0) paste(paste(new_z_names, collapse = " + "), "+") else ""
+        new_formule_red <- as.formula(paste("Surv(t_event, event) ~", new_strat_term, new_z_term, "covX_f"))
+        new_formule_full <- as.formula(paste("Surv(t_event, event) ~", new_strat_term, new_z_term, "covX_f +", new_int_ref_name))
         
         conv_perm <- FALSE
         na_perm   <- FALSE
@@ -1819,7 +1811,7 @@ simulate_one <- function(type_outcome = "continuous",
     data_tot[[paste0("int", K)]] <- int_ref
     # int_names <- c(int_names, paste0("int", K))
     int_ref_name <- paste0("int", K)
-    for (k in 1:(K - 1)) {
+    for (k in seq_len(K - 1)) {
       s_k <- strata_levels[k]
       w_k <- as.numeric(weights[s_k])
       int_k_name <- paste0("int", k)
@@ -1831,14 +1823,10 @@ simulate_one <- function(type_outcome = "continuous",
       z_names <- c(z_names, z_k_name)
     }
     # int_names <- sort(int_names)
-    formule_red <- as.formula(
-      paste("Surv(t_event, event) ~ stratum_assign_f +", 
-            paste(z_names, collapse = " + "), "+ covX_f")
-    )
-    formule_full <- as.formula(
-      paste("Surv(t_event, event) ~ stratum_assign_f +", 
-            paste(z_names, collapse = " + "), "+ covX_f +", int_ref_name)
-    )
+    strat_term <- if (K >= 2) "stratum_assign_f +" else ""
+    z_term <- if (length(z_names) > 0) paste(paste(z_names, collapse = " + "), "+") else ""
+    formule_red <- as.formula(paste("Surv(t_event, event) ~", strat_term, z_term, "covX_f"))
+    formule_full <- as.formula(paste("Surv(t_event, event) ~", strat_term, z_term, "covX_f +", int_ref_name))
     
     conv_issue_asympt <- 0
     na_issue_asympt   <- 0
