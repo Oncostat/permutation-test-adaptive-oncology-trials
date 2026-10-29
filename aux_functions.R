@@ -161,19 +161,14 @@ my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient_
     if(n_remainder > 0){
       probs_orient_vec_fixed <- ((probs_orient_vec * n_block_j) - n_each_stratum)/n_remainder
       block_stratum <- c(rep(strata_seq, n_each_stratum),
-                         sample(strata_seq, n_remainder, prob = probs_orient_vec_fixed, 
-                                replace = F))
+                         strata_seq[sample.int(length(strata_seq), n_remainder, 
+                                               prob = probs_orient_vec_fixed, replace = FALSE)])
     } 
     else{
       block_stratum <- rep(strata_seq, n_each_stratum)
     }
     
-    if(length(block_stratum)==1){
-      stratum_assign[block_j] <- block_stratum
-    }
-    else{
-      stratum_assign[block_j] <- sample(block_stratum)
-    }
+    stratum_assign[block_j] <- block_stratum[sample.int(length(block_stratum))]
   }
   
   data_rslt <- data_shuffled
@@ -261,8 +256,9 @@ data_generation_cont <- function(type_adapt, stageII_approach,
   N1_k <- nrow(data_strPBR1_keep)
   N2 <- N - N1_k  
   if(stageII_approach=="DROP"){
-    molec_alter2 <- sample(setdiff(1:M, drop_trt), prob = prevalence[!(seq_along(prevalence) %in% drop_trt)], 
-                           N2, replace = T)
+    remaining <- setdiff(1:M, drop_trt)
+    molec_alter2 <- remaining[sample.int(length(remaining), size = N2, replace = TRUE, 
+                                         prob = prevalence[remaining])]
   }
   else if(stageII_approach=="ORIENT"){
     molec_alter2 <- sample(1:M, prob = prevalence, N2, replace = T)
@@ -407,8 +403,9 @@ data_generation_surv <- function(type_adapt, stageII_approach,
   N1_k <- nrow(data1_keep)
   N2 <- N - N1_k  
   if(stageII_approach=="DROP"){
-    molec_alter2 <- sample(setdiff(1:M, drop_trt), prob = prevalence[!(seq_along(prevalence) %in% drop_trt)], 
-                           N2, replace = T)
+    remaining <- setdiff(1:M, drop_trt)
+    molec_alter2 <- remaining[sample.int(length(remaining), size = N2, replace = TRUE, 
+                                         prob = prevalence[remaining])]
   }
   else if(stageII_approach=="ORIENT"){
     molec_alter2 <- sample(1:M, prob = prevalence, N2, replace = T)
