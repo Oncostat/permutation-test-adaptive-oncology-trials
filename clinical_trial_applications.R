@@ -386,10 +386,10 @@ length(escatID)
 table(db_ext_escat$armAB,db_ext_escat$event)
 db_ext_escat <- db_ext_escat %>%
   arrange(date_rand)
-summary(coxph(Surv(time_event, event) ~ armAB_01, data = db_ext_escat), conf.int = 0.90)
+summary(coxph(Surv(time_event, event) ~ armAB_01, data = db_ext_escat))
 
 # Kaplan-Meier curve (without AZD8931, AZD4547, AZD2014, and VANDETANIB)
-PFS_km_fit_ext_escat_arm <- survfit(Surv(time_event, event) ~ armAB_01, data = db_ext_escat, conf.int = 0.90)
+PFS_km_fit_ext_escat_arm <- survfit(Surv(time_event, event) ~ armAB_01, data = db_ext_escat)
 PFS_plot_ext_escat <- ggsurvplot(PFS_km_fit_ext_escat_arm,
                                   risk.table = TRUE,
                                   censored = TRUE,
@@ -481,7 +481,7 @@ res <- c(HR    = exp(est),
 res
 
 # Kaplan-Meier curve (without AZD8931, AZD4547, AZD2014, and VANDETANIB)
-PFS_km_fit_ext_BREAST_arm <- survfit(Surv(time_event, event) ~ armAB_01, data = db_ext_BREAST, conf.int = 0.95)
+PFS_km_fit_ext_BREAST_arm <- survfit(Surv(time_event, event) ~ armAB_01, data = db_ext_BREAST)
 PFS_plot_ext_BREAST <- ggsurvplot(PFS_km_fit_ext_BREAST_arm,
                               risk.table = TRUE,
                               censored = TRUE,
