@@ -1,6 +1,6 @@
 # permutation-test-adaptive-oncology-trials
 
-## Article: Using permutation-based tests to evaluate an adaptive molecular treatment algorithm in randomized precision oncology trials (under review)
+## Article: "Using permutation-based tests to evaluate an adaptive molecular treatment algorithm in randomized precision oncology trials" (under review)
 Authors: Cristina Marelli, Xavier Paoletti, and Stefan Michiels
 
 This repository GitHub includes:
