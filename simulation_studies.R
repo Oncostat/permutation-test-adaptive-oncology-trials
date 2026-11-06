@@ -341,7 +341,7 @@ data_generation_cont <- function(type_adapt, stageII_approach,
               drop_trtIA = drop_trt))
 }
 
-## Data generation for survival setting (minimization procedure).
+## Data generation for time-to-event setting (minimization procedure).
 ## It returns the generated dataset.
 ## Arguments:
 ## * 'p_min': treatment assignment probability in minimization procedure;
@@ -1178,7 +1178,7 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
         warning = function(w){
           if(grepl("Loglik converged before variable", w$message) || 
               grepl("coefficient may be infinite", w$message)){
-            has_warning_rand <<- TRUE
+            conv_perm <<- TRUE
             invokeRestart("muffleWarning")
           }
         }
@@ -1205,8 +1205,11 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
         }
       }
       
-      if(conv_perm) conv_issues_rand <- conv_issues_rand + 1
-      if(na_perm)   na_issues_rand   <- na_issues_rand + 1
+      if(conv_perm){
+          conv_issues_rand <- conv_issues_rand + 1
+        } else if(na_perm){
+          na_issues_rand   <- na_issues_rand + 1
+        }
       
       if(!conv_perm && !na_perm){
         # computation of the test statistic at this iteration
@@ -1451,7 +1454,7 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
           warning = function(w){
             if(grepl("Loglik converged before variable", w$message) || 
                 grepl("coefficient may be infinite", w$message)){
-              has_warning_rand <<- TRUE
+              conv_perm <<- TRUE
               invokeRestart("muffleWarning")
             }
           }
@@ -1478,8 +1481,11 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
           }
         }
         
-        if(conv_perm) conv_issues_rand <- conv_issues_rand + 1
-        if(na_perm)   na_issues_rand   <- na_issues_rand + 1
+        if(conv_perm){
+          conv_issues_rand <- conv_issues_rand + 1
+        } else if(na_perm){
+          na_issues_rand   <- na_issues_rand + 1
+        }
         
         if(!conv_perm && !na_perm){
           # computation of the test statistic at this iteration
@@ -2004,12 +2010,13 @@ simulate_one <- function(type_outcome = "continuous",
 
 ## Parallelization
 future::availableCores() # check the number of available cores 
-plan(multisession, workers = 10)
+plan(multisession, workers = future::availableCores() - 2)
 
 ## Running simulation studies
-seed <- 234
-Ntrials <- 10
-Nperms <- 1
+seed <- 123
+Ntrials <- 10000
+Nperms <- 1000      
+Natts <- 100000
 
 # CONTINUOUS OUTCOMES
 
@@ -2154,7 +2161,6 @@ print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_EXT_ORIENT
               ((Ntrials-sum(rslt_cont_EXT_ORIENT_H1_df$F3_nullWALD, na.rm = T))*Nperms)*100, "%"))
 
 # Scenario IA-DROP
-Natts <- 100000
 # H0
 rslt_cont_IA_DROP_H0 <- furrr::future_map(1:Ntrials, ~{
   simulate_one(type_outcome = "continuous",
@@ -2311,7 +2317,7 @@ print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_IA_ORIENT_
               ((Ntrials-sum(rslt_cont_IA_ORIENT_H1_df$F3_nullWALD, na.rm = T))*Nperms)*100, "%"))
 
 
-# SURVIVAL OUTCOMES
+# TIME-TO-EVENT OUTCOMES
 
 # Scenario EXT-DROP
 # H0
@@ -2333,48 +2339,24 @@ rslt_surv_EXT_DROP_H0 <- furrr::future_map(1:Ntrials, ~{
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_surv_EXT_DROP_H0_df <- list_rbind(rslt_surv_EXT_DROP_H0)
 
+valid_adj <- !(rslt_surv_EXT_DROP_H0_df$conv_issue_asympt == 1 | rslt_surv_EXT_DROP_H0_df$na_issue_asympt == 1)
+n_valid_adj <- sum(valid_adj, na.rm = TRUE)
+      
 print("Type I errors:")
-print(paste("Asymptotic unadjusted score test:", table(rslt_surv_EXT_DROP_H0_df$rejects_unadj_asympt)["1"]/Ntrials*100, "%"))
-print(paste("Randomization unadjusted score test:", table(rslt_surv_EXT_DROP_H0_df$rejects_unadj_rand)["1"]/Ntrials*100, "%"))
-print(paste("Asymptotic adjusted score test:", table(rslt_surv_EXT_DROP_H0_df$rejects_adj_asympt)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in asymptotic:", sum(rslt_surv_EXT_DROP_H0_df$conv_issue_asympt == 1 | 
-                                                       rslt_surv_EXT_DROP_H0_df$na_issue_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
-print(paste("Randomization unadjusted score test:", table(rslt_surv_EXT_DROP_H0_df$rejects_adj_rand)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in permutations:", sum(rslt_surv_EXT_DROP_H0_df$conv_issues_rand == 1 | 
-                                                         rslt_surv_EXT_DROP_H0_df$na_issues_rand == 1, na.rm = TRUE)/
-              ((Ntrials-sum(rslt_surv_EXT_DROP_H0_df$conv_issue_asympt == 1 | 
-                              rslt_surv_EXT_DROP_H0_df$na_issue_asympt == 1, na.rm = TRUE))*Nperms)*100, "%"))
-
-# # H1
-# rslt_surv_EXT_DROP_H1 <- furrr::future_map(1:Ntrials, ~{
-#   simulate_one(type_outcome = "survival",
-#                type_rand = "minim",
-#                type_adapt = "EXT",
-#                stageII_approach = "DROP",
-#                N = 200, N1 = 100, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_labels = c(1,2),
-#                probs = c(0.5,0.5), bs = NULL, p_min = 0.9, adapt_time = 36, Tr = 72, 
-#                Ts = 84, delta = 0.01, alpha = NULL, lambda0 = log(2)/4, sigma = c(0.5,0.5,0.5,0.5), 
-#                coefX = 0.3, probX = 0.4,
-#                tau = matrix(c(-0.4,0,0,0,
-#                               0,-0.4,0,0,
-#                               0,0,-0.4,0,
-#                               0,0,0,-0.4), nrow = 4, ncol = 4, byrow = TRUE),
-#                drop_trt = 4, z_c = NULL, probs_orient = NULL, L = Nperms, max_atts = NULL) %>%
-#     mutate(sim=.x)
-# }, .progress = TRUE, .options = furrr_options(seed = seed))
-# rslt_surv_EXT_DROP_H1_df <- list_rbind(rslt_surv_EXT_DROP_H1)
-# 
-# print("Statistical powers:")
-# print(paste("Asymptotic unadjusted score test:", (1-table(rslt_surv_EXT_DROP_H1_df$rejects_unadj_asympt)["0"]/Ntrials)*100, "%"))
-# print(paste("Randomization unadjusted score test:", (1-table(rslt_surv_EXT_DROP_H1_df$rejects_unadj_rand)["0"]/Ntrials)*100, "%"))
-# print(paste("Asymptotic adjusted score test:", (1-table(rslt_surv_EXT_DROP_H1_df$rejects_adj_asympt)["0"]/Ntrials)*100, "%"))
-# print(paste("Convergence issues in asymptotic:", sum(rslt_surv_EXT_DROP_H1_df$conv_issue_asympt == 1 | 
-#                                                        rslt_surv_EXT_DROP_H1_df$na_issue_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
-# print(paste("Randomization unadjusted score test:", (1-table(rslt_surv_EXT_DROP_H1_df$rejects_adj_rand)["0"]/Ntrials)*100, "%"))
-# print(paste("Convergence issues in permutations:", sum(rslt_surv_EXT_DROP_H1_df$conv_issues_rand == 1 | 
-#                                                          rslt_surv_EXT_DROP_H1_df$na_issues_rand == 1, na.rm = TRUE)/
-#               ((Ntrials-sum(rslt_surv_EXT_DROP_H1_df$conv_issue_asympt == 1 | 
-#                               rslt_surv_EXT_DROP_H1_df$na_issue_asympt == 1, na.rm = TRUE))*Nperms)*100, "%"))
+print(paste("Asymptotic unadjusted score test:",
+            sum(rslt_surv_EXT_DROP_H0_df$rejects_unadj_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Randomization unadjusted score test:",
+            sum(rslt_surv_EXT_DROP_H0_df$rejects_unadj_rand == 1, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Asymptotic adjusted score test:",
+            sum(rslt_surv_EXT_DROP_H0_df$rejects_adj_asympt == 1, na.rm = TRUE)/n_valid_adj*100, "%"))
+print(paste("Convergence issues in asymptotic:",
+            (Ntrials - n_valid_adj)/Ntrials*100, "%"))
+print(paste("Randomization adjusted score test:",
+            sum(rslt_surv_EXT_DROP_H0_df$rejects_adj_rand == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_surv_EXT_DROP_H0_df$rejects_adj_rand))*100, "%"))
+print(paste("Convergence issues in randomizations:",
+            sum(rslt_surv_EXT_DROP_H0_df$conv_issues_rand + rslt_surv_EXT_DROP_H0_df$na_issues_rand, na.rm = TRUE)/
+              (n_valid_adj*Nperms)*100, "%"))
 
 # Scenario EXT-ORIENT
 # H0
@@ -2401,53 +2383,24 @@ rslt_surv_EXT_ORIENT_H0 <- furrr::future_map(1:Ntrials, ~{
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_surv_EXT_ORIENT_H0_df <- list_rbind(rslt_surv_EXT_ORIENT_H0)
 
+valid_adj <- !(rslt_surv_EXT_ORIENT_H0_df$conv_issue_asympt == 1 | rslt_surv_EXT_ORIENT_H0_df$na_issue_asympt == 1)
+n_valid_adj <- sum(valid_adj, na.rm = TRUE)
+      
 print("Type I errors:")
-print(paste("Asymptotic unadjusted score test:", table(rslt_surv_EXT_ORIENT_H0_df$rejects_unadj_asympt)["1"]/Ntrials*100, "%"))
-print(paste("Randomization unadjusted score test:", table(rslt_surv_EXT_ORIENT_H0_df$rejects_unadj_rand)["1"]/Ntrials*100, "%"))
-print(paste("Asymptotic adjusted score test:", table(rslt_surv_EXT_ORIENT_H0_df$rejects_adj_asympt)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in asymptotic:", sum(rslt_surv_EXT_ORIENT_H0_df$conv_issue_asympt == 1 | 
-                                                       rslt_surv_EXT_ORIENT_H0_df$na_issue_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
-print(paste("Randomization unadjusted score test:", table(rslt_surv_EXT_ORIENT_H0_df$rejects_adj_rand)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in permutations:", sum(rslt_surv_EXT_ORIENT_H0_df$conv_issues_rand == 1 | 
-                                                         rslt_surv_EXT_ORIENT_H0_df$na_issues_rand == 1, na.rm = TRUE)/
-              ((Ntrials-sum(rslt_surv_EXT_ORIENT_H0_df$conv_issue_asympt == 1 | 
-                              rslt_surv_EXT_ORIENT_H0_df$na_issue_asympt == 1, na.rm = TRUE))*Nperms)*100, "%"))
-
-# # H1
-# rslt_surv_EXT_ORIENT_H1 <- furrr::future_map(1:Ntrials, ~{
-#   simulate_one(type_outcome = "survival",
-#                type_rand = "minim",
-#                type_adapt = "EXT",
-#                stageII_approach = "ORIENT",
-#                N = 200, N1 = 100, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_labels = c(1,2),
-#                probs = c(0.5,0.5), bs = NULL, p_min = 0.9, adapt_time = 36, Tr = 72,
-#                Ts = 84, delta = 0.01, alpha = NULL, lambda0 = log(2)/4, sigma = c(0.5,0.5,0.5,0.5),
-#                coefX = 0.3, probX = 0.4,
-#                tau = matrix(c(-0.4,0,0,0,
-#                               0,-0.4,0,0,
-#                               0,0,-0.4,0,
-#                               -0.4,-0.4,-0.4,-0.4), nrow = 4, ncol = 4, byrow = TRUE),
-#                drop_trt = 4, z_c = NULL, 
-#                probs_orient = matrix(c(0,0,0,0,
-#                                        0,0,0,0,
-#                                        0,0,0,0,
-#                                        1/3,1/3,1/3,0), nrow = 4, ncol = 4, byrow = TRUE), 
-#                L = Nperms, max_atts = NULL) %>%
-#     mutate(sim=.x)
-# }, .progress = TRUE, .options = furrr_options(seed = seed))
-# rslt_surv_EXT_ORIENT_H1_df <- list_rbind(rslt_surv_EXT_ORIENT_H1)
-# 
-# print("Statistical powers:")
-# print(paste("Asymptotic unadjusted score test:", (1-table(rslt_surv_EXT_ORIENT_H1_df$rejects_unadj_asympt)["0"]/Ntrials)*100, "%"))
-# print(paste("Randomization unadjusted score test:", (1-table(rslt_surv_EXT_ORIENT_H1_df$rejects_unadj_rand)["0"]/Ntrials)*100, "%"))
-# print(paste("Asymptotic adjusted score test:", (1-table(rslt_surv_EXT_ORIENT_H1_df$rejects_adj_asympt)["0"]/Ntrials)*100, "%"))
-# print(paste("Convergence issues in asymptotic:", sum(rslt_surv_EXT_ORIENT_H1_df$conv_issue_asympt == 1 |
-#                                                        rslt_surv_EXT_ORIENT_H1_df$na_issue_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
-# print(paste("Randomization unadjusted score test:", (1-table(rslt_surv_EXT_ORIENT_H1_df$rejects_adj_rand)["0"]/Ntrials)*100, "%"))
-# print(paste("Convergence issues in permutations:", sum(rslt_surv_EXT_ORIENT_H1_df$conv_issues_rand == 1 |
-#                                                          rslt_surv_EXT_ORIENT_H1_df$na_issues_rand == 1, na.rm = TRUE)/
-#               ((Ntrials-sum(rslt_surv_EXT_ORIENT_H1_df$conv_issue_asympt == 1 |
-#                               rslt_surv_EXT_ORIENT_H1_df$na_issue_asympt == 1, na.rm = TRUE))*Nperms)*100, "%"))
+print(paste("Asymptotic unadjusted score test:",
+            sum(rslt_surv_EXT_ORIENT_H0_df$rejects_unadj_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Randomization unadjusted score test:",
+            sum(rslt_surv_EXT_ORIENT_H0_df$rejects_unadj_rand == 1, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Asymptotic adjusted score test:",
+            sum(rslt_surv_EXT_ORIENT_H0_df$rejects_adj_asympt == 1, na.rm = TRUE)/n_valid_adj*100, "%"))
+print(paste("Convergence issues in asymptotic:",
+            (Ntrials - n_valid_adj)/Ntrials*100, "%"))
+print(paste("Randomization adjusted score test:",
+            sum(rslt_surv_EXT_ORIENT_H0_df$rejects_adj_rand == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_surv_EXT_ORIENT_H0_df$rejects_adj_rand))*100, "%"))
+print(paste("Convergence issues in randomizations:",
+            sum(rslt_surv_EXT_ORIENT_H0_df$conv_issues_rand + rslt_surv_EXT_ORIENT_H0_df$na_issues_rand, na.rm = TRUE)/
+              (n_valid_adj*Nperms)*100, "%"))
 
 # Scenario IA-DROP
 # H0
@@ -2472,53 +2425,25 @@ rslt_surv_IA_DROP_H0_df <- list_rbind(rslt_surv_IA_DROP_H0)
 print("Dropping probabilities:")
 print(table(rslt_surv_IA_DROP_H0_df$drop_trtIA)/Ntrials*100)
 
+valid_adj <- !(rslt_surv_IA_DROP_H0_df$conv_issue_asympt == 1 | rslt_surv_IA_DROP_H0_df$na_issue_asympt == 1)
+n_valid_adj <- sum(valid_adj, na.rm = TRUE)
+      
 print("Type I errors:")
-print(paste("Asymptotic unadjusted score test:", table(rslt_surv_IA_DROP_H0_df$rejects_unadj_asympt)["1"]/Ntrials*100, "%"))
+print(paste("Asymptotic unadjusted score test:",
+            sum(rslt_surv_IA_DROP_H0_df$rejects_unadj_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
 print(paste("Mean number of attempts in randomizations:", mean(rslt_surv_IA_DROP_H0_df$Nattempts, na.rm = T)))
-print(paste("Randomization unadjusted score test:", table(rslt_surv_IA_DROP_H0_df$rejects_unadj_rand)["1"]/Ntrials*100, "%"))
-print(paste("Asymptotic adjusted score test:", table(rslt_surv_IA_DROP_H0_df$rejects_adj_asympt)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in asymptotic:", sum(rslt_surv_IA_DROP_H0_df$conv_issue_asympt == 1 | 
-                                                       rslt_surv_IA_DROP_H0_df$na_issue_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
-print(paste("Randomization unadjusted score test:", table(rslt_surv_IA_DROP_H0_df$rejects_adj_rand)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in permutations:", sum(rslt_surv_IA_DROP_H0_df$conv_issues_rand == 1 | 
-                                                         rslt_surv_IA_DROP_H0_df$na_issues_rand == 1, na.rm = TRUE)/
-              ((Ntrials-sum(rslt_surv_IA_DROP_H0_df$conv_issue_asympt == 1 | 
-                              rslt_surv_IA_DROP_H0_df$na_issue_asympt == 1, na.rm = TRUE))*Nperms)*100, "%"))
-
-# # H1
-# rslt_surv_IA_DROP_H1 <- furrr::future_map(1:Ntrials, ~{
-#   simulate_one(type_outcome = "survival",
-#                type_rand = "minim",
-#                type_adapt = "IA",
-#                stageII_approach = "DROP",
-#                N = 200, N1 = 100, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_labels = c(1,2),
-#                probs = c(0.5,0.5), bs = NULL, p_min = 0.9, adapt_time = 36, Tr = 72, 
-#                Ts = 84, delta = 0.01, alpha = NULL, lambda0 = log(2)/4, sigma = c(0.5,0.5,0.5,0.5), 
-#                coefX = 0.3, probX = 0.4,
-#                tau = matrix(c(-0.4,0,0,0,
-#                               0,-0.4,0,0,
-#                               0,0,-0.4,0,
-#                               0,0,0,0.4), nrow = 4, ncol = 4, byrow = TRUE),
-#                drop_trt = NULL, z_c = -0.84, probs_orient = NULL, L = Nperms, max_atts = Natts) %>%
-#     mutate(sim=.x)
-# }, .progress = TRUE, .options = furrr_options(seed = seed))
-# rslt_surv_IA_DROP_H1_df <- list_rbind(rslt_surv_IA_DROP_H1)
-# 
-# print("Dropping probabilities:")
-# print(table(rslt_surv_IA_DROP_H1_df$drop_trtIA)/Ntrials*100)
-# 
-# print("Statistical powers:")
-# print(paste("Asymptotic unadjusted score test:", (1-table(rslt_surv_IA_DROP_H1_df$rejects_unadj_asympt)["0"]/Ntrials)*100, "%"))
-# print(paste("Mean number of attempts in randomizations:", mean(rslt_surv_IA_DROP_H1_df$Nattempts, na.rm = T)))
-# print(paste("Randomization unadjusted score test:", (1-table(rslt_surv_IA_DROP_H1_df$rejects_unadj_rand)["0"]/Ntrials)*100, "%"))
-# print(paste("Asymptotic adjusted score test:", (1-table(rslt_surv_IA_DROP_H1_df$rejects_adj_asympt)["0"]/Ntrials)*100, "%"))
-# print(paste("Convergence issues in asymptotic:", sum(rslt_surv_IA_DROP_H1_df$conv_issue_asympt == 1 | 
-#                                                        rslt_surv_IA_DROP_H1_df$na_issue_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
-# print(paste("Randomization unadjusted score test:", (1-table(rslt_surv_IA_DROP_H1_df$rejects_adj_rand)["0"]/Ntrials)*100, "%"))
-# print(paste("Convergence issues in permutations:", sum(rslt_surv_IA_DROP_H1_df$conv_issues_rand == 1 | 
-#                                                          rslt_surv_IA_DROP_H1_df$na_issues_rand == 1, na.rm = TRUE)/
-#               ((Ntrials-sum(rslt_surv_IA_DROP_H1_df$conv_issue_asympt == 1 | 
-#                               rslt_surv_IA_DROP_H1_df$na_issue_asympt == 1, na.rm = TRUE))*Nperms)*100, "%"))
+print(paste("Randomization unadjusted score test:",
+            sum(rslt_surv_IA_DROP_H0_df$rejects_unadj_rand == 1, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Asymptotic adjusted score test:",
+            sum(rslt_surv_IA_DROP_H0_df$rejects_adj_asympt == 1, na.rm = TRUE)/n_valid_adj*100, "%"))
+print(paste("Convergence issues in asymptotic:",
+            (Ntrials - n_valid_adj)/Ntrials*100, "%"))
+print(paste("Randomization adjusted score test:",
+            sum(rslt_surv_IA_DROP_H0_df$rejects_adj_rand == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_surv_IA_DROP_H0_df$rejects_adj_rand))*100, "%"))
+print(paste("Convergence issues in randomizations:",
+            sum(rslt_surv_IA_DROP_H0_df$conv_issues_rand + rslt_surv_IA_DROP_H0_df$na_issues_rand, na.rm = TRUE)/
+              (n_valid_adj*Nperms)*100, "%"))
 
 # Scenario IA-ORIENT
 # H0
@@ -2548,57 +2473,24 @@ rslt_surv_IA_ORIENT_H0_df <- list_rbind(rslt_surv_IA_ORIENT_H0)
 print("Dropping probabilities:")
 print(table(rslt_surv_IA_ORIENT_H0_df$drop_trtIA)/Ntrials*100)
 
+valid_adj <- !(rslt_surv_IA_ORIENT_H0_df$conv_issue_asympt == 1 | rslt_surv_IA_ORIENT_H0_df$na_issue_asympt == 1)
+n_valid_adj <- sum(valid_adj, na.rm = TRUE)
+      
 print("Type I errors:")
-print(paste("Asymptotic unadjusted score test:", table(rslt_surv_IA_ORIENT_H0_df$rejects_unadj_asympt)["1"]/Ntrials*100, "%"))
+print(paste("Asymptotic unadjusted score test:",
+            sum(rslt_surv_IA_ORIENT_H0_df$rejects_unadj_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
 print(paste("Mean number of attempts in randomizations:", mean(rslt_surv_IA_ORIENT_H0_df$Nattempts, na.rm = T)))
-print(paste("Randomization unadjusted score test:", table(rslt_surv_IA_ORIENT_H0_df$rejects_unadj_rand)["1"]/Ntrials*100, "%"))
-print(paste("Asymptotic adjusted score test:", table(rslt_surv_IA_ORIENT_H0_df$rejects_adj_asympt)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in asymptotic:", sum(rslt_surv_IA_ORIENT_H0_df$conv_issue_asympt == 1 | 
-                                                       rslt_surv_IA_ORIENT_H0_df$na_issue_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
-print(paste("Randomization unadjusted score test:", table(rslt_surv_IA_ORIENT_H0_df$rejects_adj_rand)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in permutations:", sum(rslt_surv_IA_ORIENT_H0_df$conv_issues_rand == 1 | 
-                                                         rslt_surv_IA_ORIENT_H0_df$na_issues_rand == 1, na.rm = TRUE)/
-              ((Ntrials-sum(rslt_surv_IA_ORIENT_H0_df$conv_issue_asympt == 1 | 
-                              rslt_surv_IA_ORIENT_H0_df$na_issue_asympt == 1, na.rm = TRUE))*Nperms)*100, "%"))
-
-# # H1
-# rslt_surv_IA_ORIENT_H1 <- furrr::future_map(1:Ntrials, ~{
-#   simulate_one(type_outcome = "survival",
-#                type_rand = "minim",
-#                type_adapt = "IA",
-#                stageII_approach = "ORIENT",
-#                N = 200, N1 = 100, M = 4, prevalence = c(1/4,1/4,1/4,1/4), trt_labels = c(1,2),
-#                probs = c(0.5,0.5), bs = NULL, p_min = 0.9, adapt_time = 36, Tr = 72,
-#                Ts = 84, delta = 0.01, alpha = NULL, lambda0 = log(2)/4, sigma = c(0.5,0.5,0.5,0.5),
-#                coefX = 0.3, probX = 0.4,
-#                tau = matrix(c(-0.4,0,0,0,
-#                               0,-0.4,0,0,
-#                               0,0,-0.4,0,
-#                               -0.4,-0.4,-0.4,0.4), nrow = 4, ncol = 4, byrow = TRUE),
-#                drop_trt = NULL, z_c = 0, 
-#                probs_orient = matrix(c(0,1/3,1/3,1/3,
-#                                        1/3,0,1/3,1/3,
-#                                        1/3,1/3,0,1/3,
-#                                        1/3,1/3,1/3,0), nrow = 4, ncol = 4, byrow = TRUE), 
-#                L = Nperms, max_atts = Natts) %>%
-#     mutate(sim=.x)
-# }, .progress = TRUE, .options = furrr_options(seed = seed))
-# rslt_surv_IA_ORIENT_H1_df <- list_rbind(rslt_surv_IA_ORIENT_H1)
-# 
-# print("Dropping probabilities:")
-# print(table(rslt_surv_IA_ORIENT_H1_df$drop_trtIA)/Ntrials*100)
-# 
-# print("Statistical powers:")
-# print(paste("Asymptotic unadjusted score test:", (1-table(rslt_surv_IA_ORIENT_H1_df$rejects_unadj_asympt)["0"]/Ntrials)*100, "%"))
-# print(paste("Mean number of attempts in randomizations:", mean(rslt_surv_IA_ORIENT_H1_df$Nattempts, na.rm = T)))
-# print(paste("Randomization unadjusted score test:", (1-table(rslt_surv_IA_ORIENT_H1_df$rejects_unadj_rand)["0"]/Ntrials)*100, "%"))
-# print(paste("Asymptotic adjusted score test:", (1-table(rslt_surv_IA_ORIENT_H1_df$rejects_adj_asympt)["0"]/Ntrials)*100, "%"))
-# print(paste("Convergence issues in asymptotic:", sum(rslt_surv_IA_ORIENT_H1_df$conv_issue_asympt == 1 |
-#                                                        rslt_surv_IA_ORIENT_H1_df$na_issue_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
-# print(paste("Randomization unadjusted score test:", (1-table(rslt_surv_IA_ORIENT_H1_df$rejects_adj_rand)["0"]/Ntrials)*100, "%"))
-# print(paste("Convergence issues in permutations:", sum(rslt_surv_IA_ORIENT_H1_df$conv_issues_rand == 1 |
-#                                                          rslt_surv_IA_ORIENT_H1_df$na_issues_rand == 1, na.rm = TRUE)/
-#               ((Ntrials-sum(rslt_surv_IA_ORIENT_H1_df$conv_issue_asympt == 1 |
-#                               rslt_surv_IA_ORIENT_H1_df$na_issue_asympt == 1, na.rm = TRUE))*Nperms)*100, "%"))
+print(paste("Randomization unadjusted score test:",
+            sum(rslt_surv_IA_ORIENT_H0_df$rejects_unadj_rand == 1, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Asymptotic adjusted score test:",
+            sum(rslt_surv_IA_ORIENT_H0_df$rejects_adj_asympt == 1, na.rm = TRUE)/n_valid_adj*100, "%"))
+print(paste("Convergence issues in asymptotic:",
+            (Ntrials - n_valid_adj)/Ntrials*100, "%"))
+print(paste("Randomization adjusted score test:",
+            sum(rslt_surv_IA_ORIENT_H0_df$rejects_adj_rand == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_surv_IA_ORIENT_H0_df$rejects_adj_rand))*100, "%"))
+print(paste("Convergence issues in randomizations:",
+            sum(rslt_surv_IA_ORIENT_H0_df$conv_issues_rand + rslt_surv_IA_ORIENT_H0_df$na_issues_rand, na.rm = TRUE)/
+              (n_valid_adj*Nperms)*100, "%"))
 
 
