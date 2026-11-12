@@ -20,7 +20,7 @@
 
 Sys.setenv(LANG = "en")
 
-## Install and upload packages and functions
+## Install and upload packages
 
 # install.packages("car")
 library(car)
@@ -2011,12 +2011,13 @@ simulate_one <- function(type_outcome = "continuous",
   }
 }
 
-
+      
+## Running simulation studies
+      
 ## Parallelization
 future::availableCores() # check the number of available cores 
 plan(multisession, workers = future::availableCores() - 2)
 
-## Running simulation studies
 seed <- 1234
 Ntrials <- 10000
 Nperms <- 1000      
