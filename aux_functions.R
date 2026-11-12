@@ -1,3 +1,7 @@
+# Auxiliary file for "permutation-test-adaptive-oncology-trial" R Shiny application
+
+Sys.setenv(LANG = "en")
+
 ## User-defined functions
 
 ## Stratified block randomization procedure: stratification within strata and stages.
@@ -9,12 +13,12 @@
 ## * 'prob_each': vector of probabilities of assigning each treatment;
 ## * 'blocksize': size of blocks patients are assigned into.
 my_strat_block_rand <- function(dataset_torand, trt_seq = c(1,2), prob_each = c(0.5,0.5), 
-                                blocksize = 4) {
+                                blocksize = 4){
   
   # controls
-  if (!is.data.frame(dataset_torand))
+  if(!is.data.frame(dataset_torand))
     stop("dataset_torand must be a data.frame", call. = FALSE)
-  if (nrow(dataset_torand) == 0)
+  if(nrow(dataset_torand) == 0)
     stop("dataset_torand must contain at least one subject", call. = FALSE)
   required_cols <- c("stratum_assign","stage")
   missing_cols <- setdiff(required_cols, names(dataset_torand))
@@ -23,8 +27,8 @@ my_strat_block_rand <- function(dataset_torand, trt_seq = c(1,2), prob_each = c(
                 paste(missing_cols, collapse = ", ")), call. = FALSE)
   if(length(trt_seq) < 2 || anyNA(trt_seq) || anyDuplicated(trt_seq) > 0)
     stop("trt_seq must contain at least 2 distinct, non-missing labels", call. = FALSE)
-  if (length(prob_each) != length(trt_seq) || !is.numeric(prob_each) || 
-      any(!is.finite(prob_each)) || any(prob_each < 0) || any(prob_each > 1))
+  if(length(prob_each) != length(trt_seq) || !is.numeric(prob_each) || 
+     any(!is.finite(prob_each)) || any(prob_each < 0) || any(prob_each > 1))
     stop(paste0("prob_each must be a numeric vector of ", length(trt_seq), " probabilities"), 
          call. = FALSE)
   if(abs(sum(prob_each) - 1) > 1e-3)
@@ -54,10 +58,10 @@ my_strat_block_rand <- function(dataset_torand, trt_seq = c(1,2), prob_each = c(
     n_remaining <- n_stratum_assign_i %% blocksize
     
     block_assign <- c()
-    if (n_complete_blocks > 0) {
+    if(n_complete_blocks > 0){
       block_assign <- rep(1:n_complete_blocks, each = blocksize)
     }
-    if (n_remaining > 0) {
+    if(n_remaining > 0){
       block_assign <- c(block_assign, rep(n_complete_blocks + 1, n_remaining))
     }
     
@@ -73,7 +77,7 @@ my_strat_block_rand <- function(dataset_torand, trt_seq = c(1,2), prob_each = c(
       n_assigned <- sum(n_each_trt)
       n_remainder <- n_block_j - n_assigned
       
-      if (n_remainder > 0) {
+      if(n_remainder > 0){
         prob_each_fixed <- ((prob_each * n_block_j) - n_each_trt) / n_remainder
         block_trt <- c(rep(trt_seq, n_each_trt),
                        sample(trt_seq, n_remainder, prob = prob_each_fixed, replace = F))
@@ -92,7 +96,7 @@ my_strat_block_rand <- function(dataset_torand, trt_seq = c(1,2), prob_each = c(
     
     stratum_assign_rslt <- stratum_assign_i_shuffled
     stratum_assign_rslt$block <- paste0("M",stratum_assign_ID[i], "_B", block_assign, 
-                                        "_P", stratum_assign_i_shuffled$stage[i])
+                                        "_P", stratum_assign_i_shuffled$stage[1])
     stratum_assign_rslt$trt <- trt_assign
     
     result_list[[i]] <- stratum_assign_rslt
@@ -161,14 +165,19 @@ my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient_
     if(n_remainder > 0){
       probs_orient_vec_fixed <- ((probs_orient_vec * n_block_j) - n_each_stratum)/n_remainder
       block_stratum <- c(rep(strata_seq, n_each_stratum),
-                         strata_seq[sample.int(length(strata_seq), n_remainder, 
-                                               prob = probs_orient_vec_fixed, replace = FALSE)])
+                         sample(strata_seq, n_remainder, prob = probs_orient_vec_fixed, 
+                                replace = F))
     } 
     else{
       block_stratum <- rep(strata_seq, n_each_stratum)
     }
     
-    stratum_assign[block_j] <- block_stratum[sample.int(length(block_stratum))]
+    if(length(block_stratum)==1){
+      stratum_assign[block_j] <- block_stratum
+    }
+    else{
+      stratum_assign[block_j] <- sample(block_stratum)
+    }
   }
   
   data_rslt <- data_shuffled
@@ -232,7 +241,7 @@ data_generation_cont <- function(type_adapt, stageII_approach,
   if(type_adapt=="IA"){
     ctrl_label <- trt_labels[1]
     trt_label <- trt_labels[2]
-    stddiff <- sapply(1:M, function(s_assign) {
+    stddiff <- sapply(1:M, function(s_assign){
       stratum_ctrl <- data_strPBR1[data_strPBR1$stratum_assign == s_assign & data_strPBR1$trt == ctrl_label, ]
       stratum_trt <- data_strPBR1[data_strPBR1$stratum_assign == s_assign & data_strPBR1$trt == trt_label, ]
       mean_diff <- mean(stratum_trt$y) - mean(stratum_ctrl$y)
@@ -256,9 +265,8 @@ data_generation_cont <- function(type_adapt, stageII_approach,
   N1_k <- nrow(data_strPBR1_keep)
   N2 <- N - N1_k  
   if(stageII_approach=="DROP"){
-    remaining <- setdiff(1:M, drop_trt)
-    molec_alter2 <- remaining[sample.int(length(remaining), size = N2, replace = TRUE, 
-                                         prob = prevalence[remaining])]
+    molec_alter2 <- sample(setdiff(1:M, drop_trt), prob = prevalence[!(seq_along(prevalence) %in% drop_trt)], 
+                           N2, replace = T)
   }
   else if(stageII_approach=="ORIENT"){
     molec_alter2 <- sample(1:M, prob = prevalence, N2, replace = T)
@@ -304,7 +312,7 @@ data_generation_cont <- function(type_adapt, stageII_approach,
               drop_trtIA = drop_trt))
 }
 
-## Data generation for survival setting (minimization procedure).
+## Data generation for time-to-event setting (minimization procedure).
 ## It returns the generated dataset.
 ## Arguments:
 ## * 'p_min': treatment assignment probability in minimization procedure;
@@ -338,7 +346,7 @@ data_generation_surv <- function(type_adapt, stageII_approach,
   # treatment assignment (minimization)
   trt1 <- numeric(N1)
   trt1[1] <- sample(trt_labels, prob=probs, size=1)
-  for (j in 2:N1) {
+  for (j in 2:N1){
     trt1[j] <- Minirand(covmat = covmat1, j = j, covwt = rep(1, ncol(covmat1)), 
                         ratio = probs, ntrt = length(trt_labels), 
                         trtseq = trt_labels, method = "Range", result = trt1, p = p_min)
@@ -369,7 +377,7 @@ data_generation_surv <- function(type_adapt, stageII_approach,
   # INTERIM ANALYSIS
   if(type_adapt=="IA"){
     Zscore_IA <- numeric(M)
-    for (s_assign in 1:M) {
+    for (s_assign in 1:M){
       sub_df <- subset(data1, stratum_assign == s_assign)
       sub_df <- sub_df %>%
         arrange(t0)
@@ -381,7 +389,7 @@ data_generation_surv <- function(type_adapt, stageII_approach,
       Zscore_IA[s_assign] <- logHR_IA / SE_logHR_IA
     }
     worst_stratum <- which.max(Zscore_IA)
-    if (Zscore_IA[worst_stratum] > z_c) {
+    if(Zscore_IA[worst_stratum] > z_c){
       drop_trt <- worst_stratum
     }
     else{
@@ -403,9 +411,8 @@ data_generation_surv <- function(type_adapt, stageII_approach,
   N1_k <- nrow(data1_keep)
   N2 <- N - N1_k  
   if(stageII_approach=="DROP"){
-    remaining <- setdiff(1:M, drop_trt)
-    molec_alter2 <- remaining[sample.int(length(remaining), size = N2, replace = TRUE, 
-                                         prob = prevalence[remaining])]
+    molec_alter2 <- sample(setdiff(1:M, drop_trt), prob = prevalence[!(seq_along(prevalence) %in% drop_trt)], 
+                           N2, replace = T)
   }
   else if(stageII_approach=="ORIENT"){
     molec_alter2 <- sample(1:M, prob = prevalence, N2, replace = T)
@@ -440,7 +447,7 @@ data_generation_surv <- function(type_adapt, stageII_approach,
   # treatment assignment (minimization)
   covmat_tot <- as.matrix(rbind(covmat1,covmat2))
   trt_tot <- c(trt1,numeric(N2))
-  for (j in (N1+1):(N1+N2)) {
+  for (j in (N1+1):(N1+N2)){
     trt_tot[j] <- Minirand(covmat = covmat_tot, j = j, covwt = rep(1, ncol(covmat_tot)), 
                            ratio = probs, ntrt = length(trt_labels), 
                            trtseq = trt_labels, method = "Range", result = trt_tot, p = p_min)
@@ -487,16 +494,16 @@ data_generation_surv <- function(type_adapt, stageII_approach,
 Fanalysis <- function(dataset, analysis = 1){
   
   # controls
-  if (!is.data.frame(dataset))
+  if(!is.data.frame(dataset))
     stop("dataset must be a data.frame", call. = FALSE)
-  if (nrow(dataset) == 0)
+  if(nrow(dataset) == 0)
     stop("dataset must contain at least one subject", call. = FALSE)
   required_cols <- c("stratum_assign","trt","stage","stratum_orig")
   missing_cols <- setdiff(required_cols, names(dataset))
   if(length(missing_cols) > 0)
     stop(paste0("dataset must contain the following columns: ",
                 paste(missing_cols, collapse = ", ")), call. = FALSE)
-  if (length(analysis) != 1 || !is.numeric(analysis) || !analysis %in% c(1, 2, 3))
+  if(length(analysis) != 1 || !is.numeric(analysis) || !analysis %in% c(1, 2, 3))
     stop("analysis must be 1, 2 or 3", call. = FALSE)
   
   
@@ -504,13 +511,13 @@ Fanalysis <- function(dataset, analysis = 1){
     # definition of dummy variables and corresponding weights
     stratum_assign_levels <- unique(dataset$stratum_assign)
     trt_levels <- unique(dataset$trt)
-    for(s_assign in stratum_assign_levels) {
-      for(t in trt_levels) {
+    for(s_assign in stratum_assign_levels){
+      for(t in trt_levels){
         dummy_name <- paste0(ifelse(t == trt_levels[1], "C", "T"), s_assign)
         dataset[[dummy_name]] <- as.numeric(dataset$trt == t & dataset$stratum_assign == s_assign)
       }
     }
-    weights <- sapply(stratum_assign_levels, function(s_assign) {
+    weights <- sapply(stratum_assign_levels, function(s_assign){
       sum(dataset[[paste0("C", s_assign)]]) + sum(dataset[[paste0("T", s_assign)]])
     }) / nrow(dataset)
     names(weights) <- paste0("w", stratum_assign_levels)
@@ -518,7 +525,7 @@ Fanalysis <- function(dataset, analysis = 1){
                          rep(stratum_assign_levels, 2))
     # linear regression hypothesis formulation
     formula_str <- paste0("~ 0 + ", paste(dummy_vars, collapse = " + "))
-    hypothesis_terms <- sapply(stratum_assign_levels, function(s_assign) {
+    hypothesis_terms <- sapply(stratum_assign_levels, function(s_assign){
       w <- weights[paste0("w", s_assign)]
       paste0(w, "*T", s_assign, " - ", w, "*C", s_assign)
     })
@@ -527,15 +534,15 @@ Fanalysis <- function(dataset, analysis = 1){
     # definition of dummy variables and corresponding weights
     stratum_assign_levels <- unique(dataset$stratum_assign)
     trt_levels <- unique(dataset$trt)
-    for(s_assign in stratum_assign_levels) {
-      for(t in trt_levels) {
+    for(s_assign in stratum_assign_levels){
+      for(t in trt_levels){
         dummy_name <- paste0(ifelse(t == trt_levels[1], "C", "T"), s_assign)
         dataset[[dummy_name]] <- as.numeric(dataset$trt == t & dataset$stratum_assign == s_assign)
       }
     }
     period_dummy_vars <- c()
     existing_combinations <- unique(dataset[dataset$stage == 2, c("stratum_orig", "stratum_assign")])
-    for(i in 1:nrow(existing_combinations)) {
+    for(i in 1:nrow(existing_combinations)){
       s_orig <- existing_combinations$stratum_orig[i]
       s_assign <- existing_combinations$stratum_assign[i]
       dummy_name <- paste0("P", s_orig, s_assign, "II")
@@ -544,7 +551,7 @@ Fanalysis <- function(dataset, analysis = 1){
                                             dataset$stage == 2)
       period_dummy_vars <- c(period_dummy_vars, dummy_name)
     }
-    weights <- sapply(stratum_assign_levels, function(s_assign) {
+    weights <- sapply(stratum_assign_levels, function(s_assign){
       sum(dataset[[paste0("C", s_assign)]]) + sum(dataset[[paste0("T", s_assign)]])
     }) / nrow(dataset)
     names(weights) <- paste0("w", stratum_assign_levels)
@@ -553,7 +560,7 @@ Fanalysis <- function(dataset, analysis = 1){
     all_dummy_vars <- c(trt_dummy_vars, period_dummy_vars)
     # linear regression hypothesis formulation
     formula_str <- paste0("~ 0 + ", paste(all_dummy_vars, collapse = " + "))
-    hypothesis_terms <- sapply(stratum_assign_levels, function(s_assign) {
+    hypothesis_terms <- sapply(stratum_assign_levels, function(s_assign){
       w <- weights[paste0("w", s_assign)]
       paste0(w, "*T", s_assign, " - ", w, "*C", s_assign)
     })
@@ -563,8 +570,8 @@ Fanalysis <- function(dataset, analysis = 1){
     stratum_assign_levels <- sort(unique(dataset$stratum_assign))
     trt_levels <- sort(unique(dataset$trt))
     stratum_orig_levels <- sort(unique(dataset$stratum_orig))
-    for(s_assign in stratum_assign_levels) {
-      for(t in trt_levels) {
+    for(s_assign in stratum_assign_levels){
+      for(t in trt_levels){
         dummy_name <- paste0(ifelse(t == trt_levels[1], "C", "T"), s_assign, "I")
         dataset[[dummy_name]] <- as.numeric(dataset$trt == t & 
                                               dataset$stratum_assign == s_assign & 
@@ -573,10 +580,10 @@ Fanalysis <- function(dataset, analysis = 1){
     }
     stage2_dummy_vars <- c()
     existing_combinations <- unique(dataset[dataset$stage == 2, c("stratum_orig", "stratum_assign")])
-    for(i in 1:nrow(existing_combinations)) {
+    for(i in 1:nrow(existing_combinations)){
       s_orig <- existing_combinations$stratum_orig[i]
       s_assign <- existing_combinations$stratum_assign[i]
-      for(t in trt_levels) {
+      for(t in trt_levels){
         dummy_name <- paste0(ifelse(t == trt_levels[1], "C", "T"), s_orig, s_assign, "II")
         dataset[[dummy_name]] <- as.numeric(dataset$trt == t & 
                                               dataset$stratum_orig == s_orig & 
@@ -586,12 +593,12 @@ Fanalysis <- function(dataset, analysis = 1){
       }
     }
     n_strata <- list()
-    for(s_assign in stratum_assign_levels) {
+    for(s_assign in stratum_assign_levels){
       n_strata[[paste0("n", s_assign, "I")]] <- sum(dataset[[paste0("C", s_assign, "I")]]) + 
         sum(dataset[[paste0("T", s_assign, "I")]])
       
       n_II <- 0
-      for(s_orig in stratum_orig_levels) {
+      for(s_orig in stratum_orig_levels){
         c_var <- paste0("C", s_orig, s_assign, "II")
         t_var <- paste0("T", s_orig, s_assign, "II")
         if(c_var %in% names(dataset)) n_II <- n_II + sum(dataset[[c_var]])
@@ -600,22 +607,22 @@ Fanalysis <- function(dataset, analysis = 1){
       n_strata[[paste0("n", s_assign, "II")]] <- n_II
     }
     weights_I <- list()
-    for(s_assign in stratum_assign_levels) {
+    for(s_assign in stratum_assign_levels){
       n_sI <- n_strata[[paste0("n", s_assign, "I")]]
-      if(n_sI > 0) {
+      if(n_sI > 0){
         w <- ((sum(dataset[[paste0("C", s_assign, "I")]]) + 
                  sum(dataset[[paste0("T", s_assign, "I")]])) / n_sI) / 2
         weights_I[[paste0("w", s_assign, "I")]] <- w
       }
     }
     weights_II <- list()
-    for(s_assign in stratum_assign_levels) {
+    for(s_assign in stratum_assign_levels){
       n_sII <- n_strata[[paste0("n", s_assign, "II")]]
-      for(s_orig in stratum_orig_levels) {
+      for(s_orig in stratum_orig_levels){
         c_var <- paste0("C", s_orig, s_assign, "II")
         t_var <- paste0("T", s_orig, s_assign, "II")
-        if(c_var %in% names(dataset) && t_var %in% names(dataset)) {
-          if(n_sII > 0) {
+        if(c_var %in% names(dataset) && t_var %in% names(dataset)){
+          if(n_sII > 0){
             w <- ((sum(dataset[[c_var]]) + sum(dataset[[t_var]])) / n_sII) / 2
             weights_II[[paste0("w", s_orig, s_assign, "II")]] <- w
           }
@@ -628,18 +635,18 @@ Fanalysis <- function(dataset, analysis = 1){
     # linear regression hypothesis formulation
     formula_str <- paste0("~ 0 + ", paste(all_dummy_vars, collapse = " + "))
     hypothesis_terms <- c()
-    for(s_assign in stratum_assign_levels) {
+    for(s_assign in stratum_assign_levels){
       w_name <- paste0("w", s_assign, "I")
-      if(w_name %in% names(weights_I)) {
+      if(w_name %in% names(weights_I)){
         w <- weights_I[[w_name]]
         term <- paste0(w, "*T", s_assign, "I - ", w, "*C", s_assign, "I")
         hypothesis_terms <- c(hypothesis_terms, term)
       }
     }
-    for(s_assign in stratum_assign_levels) {
-      for(s_orig in stratum_orig_levels) {
+    for(s_assign in stratum_assign_levels){
+      for(s_orig in stratum_orig_levels){
         w_name <- paste0("w", s_orig, s_assign, "II")
-        if(w_name %in% names(weights_II)) {
+        if(w_name %in% names(weights_II)){
           w <- weights_II[[w_name]]
           term <- paste0(w, "*T", s_orig, s_assign, "II - ", w, "*C", s_orig, s_assign, "II")
           hypothesis_terms <- c(hypothesis_terms, term)
@@ -659,30 +666,30 @@ Fanalysis <- function(dataset, analysis = 1){
 ## Arguments:
 ## * 'dataset': dataset to be permuted, which must contain the columns 'trt' and 'block';
 ## * 'seed': can be set for reproducibility (not recommended in the simulation study).
-permute_trts_by_block <- function(dataset, seed = NULL) {
+permute_trts_by_block <- function(dataset, seed = NULL){
   
   # controls
-  if (!is.data.frame(dataset))
+  if(!is.data.frame(dataset))
     stop("dataset must be a data.frame", call. = FALSE)
-  if (nrow(dataset) == 0)
+  if(nrow(dataset) == 0)
     stop("dataset must contain at least one subject", call. = FALSE)
   required_cols <- c("trt","block")
   missing_cols <- setdiff(required_cols, names(dataset))
   if(length(missing_cols) > 0)
     stop(paste0("dataset must contain the following columns: ",
                 paste(missing_cols, collapse = ", ")), call. = FALSE)
-  if (!is.null(seed) &&
-      (length(seed) != 1 || !is.numeric(seed) || !is.finite(seed) || seed != round(seed)))
+  if(!is.null(seed) &&
+     (length(seed) != 1 || !is.numeric(seed) || !is.finite(seed) || seed != round(seed)))
     stop("seed must be either NULL or a finite integer", call. = FALSE)
   
   
-  if (!is.null(seed)) set.seed(seed)
+  if(!is.null(seed)) set.seed(seed)
   
   permuted_dataset <- dataset
   
   unique_blocks <- unique(dataset$block)
   
-  for (block_id in unique_blocks) {
+  for (block_id in unique_blocks){
     
     block_indices <- which(dataset$block == block_id)
     
@@ -713,9 +720,9 @@ permute_trts_by_block <- function(dataset, seed = NULL) {
 perm_test_pval_EXT <- function(dataset, stat_F1_obs = NA, stat_F2_obs = NA, stat_F3_obs = NA, L){
   
   # controls
-  if (!is.data.frame(dataset))
+  if(!is.data.frame(dataset))
     stop("dataset must be a data.frame", call. = FALSE)
-  if (nrow(dataset) == 0)
+  if(nrow(dataset) == 0)
     stop("dataset must contain at least one subject", call. = FALSE)
   required_cols <- c("ID","y")
   missing_cols <- setdiff(required_cols, names(dataset))
@@ -724,8 +731,8 @@ perm_test_pval_EXT <- function(dataset, stat_F1_obs = NA, stat_F2_obs = NA, stat
                 paste(missing_cols, collapse = ", ")), call. = FALSE)
   is_na_or_finite <- function(x)
     length(x) == 1 && (is.na(x) || (is.numeric(x) && is.finite(x)))
-  for (nm in c("stat_F1_obs", "stat_F2_obs", "stat_F3_obs")) {
-    if (!is_na_or_finite(get(nm)))
+  for (nm in c("stat_F1_obs", "stat_F2_obs", "stat_F3_obs")){
+    if(!is_na_or_finite(get(nm)))
       stop(sprintf("'%s' must be either NA or a finite number", nm), call. = FALSE)
   }
   
@@ -749,7 +756,7 @@ perm_test_pval_EXT <- function(dataset, stat_F1_obs = NA, stat_F2_obs = NA, stat
       new_formula_str_F1 <- new_analysis_F1$formula
       model_F1_l <- lm(as.formula(paste("y", new_formula_str_F1)), 
                        data = new_dataset_dummy_F1)
-      if(!any(is.na(coef(model_F1_l)))) {
+      if(!any(is.na(coef(model_F1_l)))){
         new_hypothesis_F1 <- new_analysis_F1$hypoth
         # computation of the test statistic at this iteration
         wald_F1_L[l] <- linearHypothesis(model_F1_l, new_hypothesis_F1)$F[2] 
@@ -763,7 +770,7 @@ perm_test_pval_EXT <- function(dataset, stat_F1_obs = NA, stat_F2_obs = NA, stat
       new_formula_str_F2 <- new_analysis_F2$formula
       model_F2_l <- lm(as.formula(paste("y", new_formula_str_F2)), 
                        data = new_dataset_dummy_F2)
-      if(!any(is.na(coef(model_F2_l)))) {
+      if(!any(is.na(coef(model_F2_l)))){
         new_hypothesis_F2 <- new_analysis_F2$hypoth
         # computation of the test statistic at this iteration
         wald_F2_L[l] <- linearHypothesis(model_F2_l, new_hypothesis_F2)$F[2] 
@@ -777,7 +784,7 @@ perm_test_pval_EXT <- function(dataset, stat_F1_obs = NA, stat_F2_obs = NA, stat
       new_formula_str_F3 <- new_analysis_F3$formula
       model_F3_l <- lm(as.formula(paste("y", new_formula_str_F3)), 
                        data = new_dataset_dummy_F3)
-      if(!any(is.na(coef(model_F3_l)))) {
+      if(!any(is.na(coef(model_F3_l)))){
         new_hypothesis_F3 <- new_analysis_F3$hypoth
         # computation of the test statistic at this iteration
         wald_F3_L[l] <- linearHypothesis(model_F3_l, new_hypothesis_F3)$F[2] 
@@ -836,13 +843,13 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
                               stat_F2_obs = NA, stat_F3_obs = NA, L, max_atts){
   
   # controls
-  if (!is.data.frame(dataset1))
+  if(!is.data.frame(dataset1))
     stop("dataset1 must be a data.frame", call. = FALSE)
-  if (nrow(dataset1) == 0)
+  if(nrow(dataset1) == 0)
     stop("dataset1 must contain at least one subject", call. = FALSE)
-  if (!is.data.frame(dataset2))
+  if(!is.data.frame(dataset2))
     stop("dataset2 must be a data.frame", call. = FALSE)
-  if (nrow(dataset2) == 0)
+  if(nrow(dataset2) == 0)
     stop("dataset2 must contain at least one subject", call. = FALSE)
   required_cols <- c("ID","trt","stratum_assign","y","stratum_orig")
   missing_cols1 <- setdiff(required_cols, names(dataset1))
@@ -853,13 +860,13 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
   if(length(missing_cols2) > 0)
     stop(paste0("dataset2 must contain the following columns: ",
                 paste(missing_cols2, collapse = ", ")), call. = FALSE)
-  if (length(drop_trtIA) != 1 || !is.numeric(drop_trtIA) || !is.finite(drop_trtIA) ||
-      drop_trtIA != round(drop_trtIA) || drop_trtIA < 0)
+  if(length(drop_trtIA) != 1 || !is.numeric(drop_trtIA) || !is.finite(drop_trtIA) ||
+     drop_trtIA != round(drop_trtIA) || drop_trtIA < 0)
     stop("drop_trtIA must be a non-negative integer", call. = FALSE)
   is_na_or_finite <- function(x)
     length(x) == 1 && (is.na(x) || (is.numeric(x) && is.finite(x)))
-  for (nm in c("stat_F1_obs", "stat_F2_obs", "stat_F3_obs")) {
-    if (!is_na_or_finite(get(nm)))
+  for (nm in c("stat_F1_obs", "stat_F2_obs", "stat_F3_obs")){
+    if(!is_na_or_finite(get(nm)))
       stop(sprintf("'%s' must be either NA or a finite number", nm), call. = FALSE)
   }
   
@@ -929,7 +936,7 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
         new_formula_str_F1 <- new_analysis_F1$formula
         model_F1_l <- lm(as.formula(paste("y", new_formula_str_F1)), 
                          data = new_dataset_dummy_F1)
-        if(!any(is.na(coef(model_F1_l)))) {
+        if(!any(is.na(coef(model_F1_l)))){
           new_hypothesis_F1 <- new_analysis_F1$hypoth
           # computation of the test statistic at this iteration
           wald_F1_L[l] <- linearHypothesis(model_F1_l, new_hypothesis_F1)$F[2] 
@@ -943,7 +950,7 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
         new_formula_str_F2 <- new_analysis_F2$formula
         model_F2_l <- lm(as.formula(paste("y", new_formula_str_F2)), 
                          data = new_dataset_dummy_F2)
-        if(!any(is.na(coef(model_F2_l)))) {
+        if(!any(is.na(coef(model_F2_l)))){
           new_hypothesis_F2 <- new_analysis_F2$hypoth
           # computation of the test statistic at this iteration
           wald_F2_L[l] <- linearHypothesis(model_F2_l, new_hypothesis_F2)$F[2] 
@@ -957,7 +964,7 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
         new_formula_str_F3 <- new_analysis_F3$formula
         model_F3_l <- lm(as.formula(paste("y", new_formula_str_F3)), 
                          data = new_dataset_dummy_F3)
-        if(!any(is.na(coef(model_F3_l)))) {
+        if(!any(is.na(coef(model_F3_l)))){
           new_hypothesis_F3 <- new_analysis_F3$hypoth
           # computation of the test statistic at this iteration
           wald_F3_L[l] <- linearHypothesis(model_F3_l, new_hypothesis_F3)$F[2] 
@@ -978,7 +985,7 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
     pvalue_F1 <- NA
     nulls_F1 <- NA
   }
-  if(!is.null(stat_F2_obs)){
+  if(!is.na(stat_F2_obs)){
     # computation two-sided p-value
     pvalue_F2 <- (1/sum(!is.na(I_F2_L)))*sum(I_F2_L, na.rm = T)
     # numbers of permutations with model convergence issues
@@ -988,7 +995,7 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
     pvalue_F2 <- NA
     nulls_F2 <- NA
   }
-  if(!is.null(stat_F3_obs)){
+  if(!is.na(stat_F3_obs)){
     # computation two-sided p-value
     pvalue_F3 <- (1/sum(!is.na(I_F3_L)))*sum(I_F3_L, na.rm = T) 
     # numbers of permutations with model convergence issues
@@ -1017,19 +1024,19 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
 ## * 'cov_list': list of variables names to consider as covariates in the minimization procedure;
 ## * the other parameters are described in the previous functions.
 rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_obs = NA, 
-                               L, cov_list, trt_labels, probs, p_min) {
+                               L, cov_list, trt_labels, probs, p_min){
   
   # controls
-  if (!is.data.frame(dataset))
+  if(!is.data.frame(dataset))
     stop("dataset must be a data.frame", call. = FALSE)
-  if (nrow(dataset) == 0)
+  if(nrow(dataset) == 0)
     stop("dataset must contain at least one subject", call. = FALSE)
   required_cols <- c("ID","stratum_assign","covX","t_event","event")
   missing_cols <- setdiff(required_cols, names(dataset))
   if(length(missing_cols) > 0)
     stop(paste0("dataset must contain the following columns: ",
                 paste(missing_cols, collapse = ", ")), call. = FALSE)
-  if (!is.numeric(keepID) || length(keepID) == 0 || any(!is.finite(keepID)))
+  if(!is.numeric(keepID) || length(keepID) == 0 || any(!is.finite(keepID)))
     stop("keepID must be a non-empty numeric vector with finite values", call. = FALSE)
   if(anyDuplicated(keepID) > 0)
     stop("keepID must not contain duplicated IDs", call. = FALSE)
@@ -1039,12 +1046,12 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
                 paste(missing_ID, collapse = ", ")), call. = FALSE)
   is_na_or_finite <- function(x)
     length(x) == 1 && (is.na(x) || (is.numeric(x) && is.finite(x)))
-  for (nm in c("stat_unadj_obs", "stat_adj_obs")) {
-    if (!is_na_or_finite(get(nm)))
+  for (nm in c("stat_unadj_obs", "stat_adj_obs")){
+    if(!is_na_or_finite(get(nm)))
       stop(sprintf("'%s' must be either NA or a finite number", nm), call. = FALSE)
   }
-  if (!is.character(cov_list) || length(cov_list) == 0 || anyNA(cov_list) || 
-      anyDuplicated(cov_list) > 0)
+  if(!is.character(cov_list) || length(cov_list) == 0 || anyNA(cov_list) || 
+     anyDuplicated(cov_list) > 0)
     stop("cov_list must be a non-empty character vector without duplicates", call. = FALSE)
   missing_cov <- setdiff(cov_list, colnames(dataset))
   if(length(missing_cov) > 0)
@@ -1068,7 +1075,7 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
     
     res <- numeric(N_full)
     res[1] <- sample(trt_labels, prob=probs, size=1)
-    for(j in 2:N_full) {
+    for(j in 2:N_full){
       res[j] <- Minirand(
         covmat = covmat_full,
         j = j,
@@ -1111,7 +1118,7 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
       data_analysis[[paste0("int", new_K)]] <- new_int_ref
       # new_int_names <- c(new_int_names, paste0("int", new_K))
       new_int_ref_name <- paste0("int", new_K)
-      for (new_k in seq_len(new_K - 1)) {
+      for (new_k in 1:(new_K - 1)){
         new_s_k <- new_strata_levels[new_k]
         new_w_k <- as.numeric(new_weights[new_s_k])
         new_int_k_name <- paste0("int", new_k)
@@ -1123,10 +1130,14 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
         new_z_names <- c(new_z_names, new_z_k_name)
       }
       # new_int_names <- sort(new_int_names)
-      new_strat_term <- if (new_K >= 2) "stratum_assign_f +" else ""
-      new_z_term <- if (length(new_z_names) > 0) paste(paste(new_z_names, collapse = " + "), "+") else ""
-      new_formule_red <- as.formula(paste("Surv(t_event, event) ~", new_strat_term, new_z_term, "covX_f"))
-      new_formule_full <- as.formula(paste("Surv(t_event, event) ~", new_strat_term, new_z_term, "covX_f +", new_int_ref_name))
+      new_formule_red <- as.formula(
+        paste("Surv(t_event, event) ~ stratum_assign_f +", 
+              paste(new_z_names, collapse = " + "), "+ covX_f")
+      )
+      new_formule_full <- as.formula(
+        paste("Surv(t_event, event) ~ stratum_assign_f +", 
+              paste(new_z_names, collapse = " + "), "+ covX_f +", new_int_ref_name)
+      )
       
       conv_perm <- FALSE
       na_perm   <- FALSE
@@ -1135,20 +1146,21 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
         tryCatch({
           coxph(new_formule_red, data = data_analysis)
         }, error = function(e) NULL),
-        warning = function(w) {
-          if (grepl("Loglik converged before variable", w$message) || 
-              grepl("coefficient may be infinite", w$message)) {
-            has_warning_rand <<- TRUE
+        warning = function(w){
+          if(grepl("Loglik converged before variable", w$message) || 
+             grepl("coefficient may be infinite", w$message) ||
+             grepl("did not converge", w$message, fixed = TRUE)){
+            conv_perm <<- TRUE
             invokeRestart("muffleWarning")
           }
         }
       )
       new_model_full <- NULL
-      if (is.null(new_model_red)) {
+      if(is.null(new_model_red) || conv_perm){
         conv_perm <- TRUE                          
-      } else if (anyNA(coef(new_model_red))) {
+      } else if(anyNA(coef(new_model_red))){
         na_perm <- TRUE                          
-      } else if (!conv_perm) {
+      } else if(!conv_perm){
         new_model_full <- tryCatch(
           suppressWarnings(
             coxph(new_formule_full,
@@ -1158,17 +1170,20 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
           ),
           error = function(e) NULL
         )
-        if (is.null(new_model_full)) {
+        if(is.null(new_model_full)){
           conv_perm <- TRUE                        
-        } else if (anyNA(coef(new_model_full)) || is.na(new_model_full$score)) {
+        } else if(anyNA(coef(new_model_full)) || is.na(new_model_full$score)){
           na_perm <- TRUE                          
         }
       }
       
-      if (conv_perm) conv_issues_rand <- conv_issues_rand + 1
-      if (na_perm)   na_issues_rand   <- na_issues_rand + 1
+      if(conv_perm){
+        conv_issues_rand <- conv_issues_rand + 1
+      } else if(na_perm){
+        na_issues_rand   <- na_issues_rand + 1
+      }
       
-      if (!conv_perm && !na_perm) {
+      if(!conv_perm && !na_perm){
         # computation of the test statistic at this iteration
         S_adj_L[l] <- unname(new_model_full$score)
         # checking the condition |Sl|>=|Sobs| at this iteration
@@ -1181,7 +1196,7 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
   pvalue_unadj <- (1/sum(!is.na(I_unadj_L)))*sum(I_unadj_L, na.rm = T)
   
   valid_permutations <- sum(!is.na(I_adj_L))
-  if (valid_permutations > 0) {
+  if(valid_permutations > 0){
     pvalue_adj <- sum(I_adj_L, na.rm = TRUE) / valid_permutations
   } else {
     pvalue_adj <- NA_real_
@@ -1202,13 +1217,13 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
                               stat_adj_obs = NA, L, max_atts, cov_list, trt_labels, probs, p_min){
   
   # controls
-  if (!is.data.frame(dataset1))
+  if(!is.data.frame(dataset1))
     stop("dataset1 must be a data.frame", call. = FALSE)
-  if (nrow(dataset1) == 0)
+  if(nrow(dataset1) == 0)
     stop("dataset1 must contain at least one subject", call. = FALSE)
-  if (!is.data.frame(dataset2))
+  if(!is.data.frame(dataset2))
     stop("dataset2 must be a data.frame", call. = FALSE)
-  if (nrow(dataset2) == 0)
+  if(nrow(dataset2) == 0)
     stop("dataset2 must contain at least one subject", call. = FALSE)
   required_cols1 <- c("ID","covX","t_eventIA","eventIA","stratum_assign","t_event","event")
   missing_cols1 <- setdiff(required_cols1, names(dataset1))
@@ -1220,7 +1235,7 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
   if(length(missing_cols2) > 0)
     stop(paste0("dataset2 must contain the following columns: ",
                 paste(missing_cols2, collapse = ", ")), call. = FALSE)
-  if (!is.numeric(keepID) || length(keepID) == 0 || any(!is.finite(keepID)))
+  if(!is.numeric(keepID) || length(keepID) == 0 || any(!is.finite(keepID)))
     stop("keepID must be a non-empty numeric vector with finite values", call. = FALSE)
   if(anyDuplicated(keepID) > 0)
     stop("keepID must not contain duplicated IDs", call. = FALSE)
@@ -1228,24 +1243,24 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
   if(length(missing_ID) > 0)
     stop(paste0("These keepID values are neither in dataset1 nor in dataset2: ",
                 paste(missing_ID, collapse = ", ")), call. = FALSE)
-  if (length(drop_trtIA) != 1 || !is.numeric(drop_trtIA) || !is.finite(drop_trtIA) ||
-      drop_trtIA != round(drop_trtIA) || drop_trtIA < 0)
+  if(length(drop_trtIA) != 1 || !is.numeric(drop_trtIA) || !is.finite(drop_trtIA) ||
+     drop_trtIA != round(drop_trtIA) || drop_trtIA < 0)
     stop("drop_trtIA must be a non-negative integer", call. = FALSE)
   is_na_or_finite <- function(x)
     length(x) == 1 && (is.na(x) || (is.numeric(x) && is.finite(x)))
-  for (nm in c("stat_unadj_obs", "stat_adj_obs")) {
-    if (!is_na_or_finite(get(nm)))
+  for (nm in c("stat_unadj_obs", "stat_adj_obs")){
+    if(!is_na_or_finite(get(nm)))
       stop(sprintf("'%s' must be either NA or a finite number", nm), call. = FALSE)
   }
-  if (!is.character(cov_list) || length(cov_list) == 0 || anyNA(cov_list) || 
-      anyDuplicated(cov_list) > 0)
+  if(!is.character(cov_list) || length(cov_list) == 0 || anyNA(cov_list) || 
+     anyDuplicated(cov_list) > 0)
     stop("cov_list must be a non-empty character vector without duplicates", call. = FALSE)
   missing_cov1 <- setdiff(cov_list, colnames(dataset1))
-  if (length(missing_cov1) > 0)
+  if(length(missing_cov1) > 0)
     stop(paste0("These cov_list entries are not columns of dataset1: ",
                 paste(missing_cov1, collapse = ", ")), call. = FALSE)
   missing_cov2 <- setdiff(cov_list, colnames(dataset2))
-  if (length(missing_cov2) > 0)
+  if(length(missing_cov2) > 0)
     stop(paste0("These cov_list entries are not columns of dataset2: ",
                 paste(missing_cov2, collapse = ", ")), call. = FALSE)
   
@@ -1279,7 +1294,7 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
     
     res1 <- numeric(N1)
     res1[1] <- sample(trt_labels, prob=probs, size=1)
-    for(j in 2:N1) {
+    for(j in 2:N1){
       res1[j] <- Minirand(
         covmat = covmat1,
         j = j,
@@ -1300,20 +1315,19 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
     
     # Interim analysis
     new_Zscore_IA <- numeric(M)
-    for (new_s_assign in 1:M) {
+    for (new_s_assign in 1:M){
       new_sub_df <- subset(new_dataset1, stratum_assign == new_s_assign)
       new_sub_df$covX_f <- factor(new_sub_df$covX)
       new_sub_df <- new_sub_df %>%
         arrange(t0)
       new_sub_df$trt_rand_bin <- new_sub_df$trt_rand - 1
-      new_cox_IA <- coxph(Surv(t_eventIA, eventIA) ~ trt_rand_bin + strata(covX_f), 
-                          data=new_sub_df)
+      new_cox_IA <- coxph(Surv(t_eventIA, eventIA) ~ trt_rand_bin + strata(covX_f), data=new_sub_df)
       new_logHR_IA <- as.numeric(coef(new_cox_IA)["trt_rand_bin"])
       new_SE_logHR_IA <- sqrt(as.numeric(vcov(new_cox_IA)["trt_rand_bin","trt_rand_bin"]))
       new_Zscore_IA[new_s_assign] <- new_logHR_IA / new_SE_logHR_IA
     }
     new_worst_stratum <- which.max(new_Zscore_IA)
-    if (new_Zscore_IA[new_worst_stratum] > z_c) {
+    if(new_Zscore_IA[new_worst_stratum] > z_c){
       new_drop_trt <- new_worst_stratum
     }
     else{
@@ -1328,7 +1342,7 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
       covmat_tot <- as.matrix(rbind(covmat1,covmat2))
       
       res_tot <- c(res1,numeric(N2))
-      for(j in (N1+1):(N1+N2)) {
+      for(j in (N1+1):(N1+N2)){
         res_tot[j] <- Minirand(
           covmat = covmat_tot,
           j = j,
@@ -1380,7 +1394,7 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
         data_analysis[[paste0("int", new_K)]] <- new_int_ref
         # new_int_names <- c(new_int_names, paste0("int", new_K))
         new_int_ref_name <- paste0("int", new_K)
-        for (new_k in seq_len(new_K - 1)) {
+        for (new_k in 1:(new_K - 1)){
           new_s_k <- new_strata_levels[new_k]
           new_w_k <- as.numeric(new_weights[new_s_k])
           new_int_k_name <- paste0("int", new_k)
@@ -1392,10 +1406,14 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
           new_z_names <- c(new_z_names, new_z_k_name)
         }
         # new_int_names <- sort(new_int_names)
-        new_strat_term <- if (new_K >= 2) "stratum_assign_f +" else ""
-        new_z_term <- if (length(new_z_names) > 0) paste(paste(new_z_names, collapse = " + "), "+") else ""
-        new_formule_red <- as.formula(paste("Surv(t_event, event) ~", new_strat_term, new_z_term, "covX_f"))
-        new_formule_full <- as.formula(paste("Surv(t_event, event) ~", new_strat_term, new_z_term, "covX_f +", new_int_ref_name))
+        new_formule_red <- as.formula(
+          paste("Surv(t_event, event) ~ stratum_assign_f +", 
+                paste(new_z_names, collapse = " + "), "+ covX_f")
+        )
+        new_formule_full <- as.formula(
+          paste("Surv(t_event, event) ~ stratum_assign_f +", 
+                paste(new_z_names, collapse = " + "), "+ covX_f +", new_int_ref_name)
+        )
         
         conv_perm <- FALSE
         na_perm   <- FALSE
@@ -1404,20 +1422,21 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
           tryCatch({
             coxph(new_formule_red, data = data_analysis)
           }, error = function(e) NULL),
-          warning = function(w) {
-            if (grepl("Loglik converged before variable", w$message) || 
-                grepl("coefficient may be infinite", w$message)) {
-              has_warning_rand <<- TRUE
+          warning = function(w){
+            if(grepl("Loglik converged before variable", w$message) || 
+               grepl("coefficient may be infinite", w$message) ||
+               grepl("did not converge", w$message, fixed = TRUE)){
+              conv_perm <<- TRUE
               invokeRestart("muffleWarning")
             }
           }
         )
         new_model_full <- NULL
-        if (is.null(new_model_red)) {
+        if(is.null(new_model_red) || conv_perm){
           conv_perm <- TRUE                          
-        } else if (anyNA(coef(new_model_red))) {
+        } else if(anyNA(coef(new_model_red))){
           na_perm <- TRUE                          
-        } else if (!conv_perm) {
+        } else if(!conv_perm){
           new_model_full <- tryCatch(
             suppressWarnings(
               coxph(new_formule_full,
@@ -1427,17 +1446,20 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
             ),
             error = function(e) NULL
           )
-          if (is.null(new_model_full)) {
+          if(is.null(new_model_full)){
             conv_perm <- TRUE                        
-          } else if (anyNA(coef(new_model_full)) || is.na(new_model_full$score)) {
+          } else if(anyNA(coef(new_model_full)) || is.na(new_model_full$score)){
             na_perm <- TRUE                          
           }
         }
         
-        if (conv_perm) conv_issues_rand <- conv_issues_rand + 1
-        if (na_perm)   na_issues_rand   <- na_issues_rand + 1
+        if(conv_perm){
+          conv_issues_rand <- conv_issues_rand + 1
+        } else if(na_perm){
+          na_issues_rand   <- na_issues_rand + 1
+        }
         
-        if (!conv_perm && !na_perm) {
+        if(!conv_perm && !na_perm){
           # computation of the test statistic at this iteration
           S_adj_L[l] <- unname(new_model_full$score)
           # checking the condition |Sl|>=|Sobs| at this iteration
@@ -1453,7 +1475,7 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
   pvalue_unadj <- (1/sum(!is.na(I_unadj_L)))*sum(I_unadj_L, na.rm = T)
   
   valid_permutations <- sum(!is.na(I_adj_L))
-  if (valid_permutations > 0) {
+  if(valid_permutations > 0){
     pvalue_adj <- sum(I_adj_L, na.rm = TRUE) / valid_permutations
   } else {
     pvalue_adj <- NA_real_
@@ -1486,18 +1508,18 @@ simulate_one <- function(type_outcome = "continuous",
                          L = 1000, max_atts = NULL){
   
   # controls
-  if (length(N) != 1 || !is.numeric(N) || !is.finite(N) || N != round(N) || N <= 0)
+  if(length(N) != 1 || !is.numeric(N) || !is.finite(N) || N != round(N) || N <= 0)
     stop("N must be a finite and positive integer", call. = FALSE)
   if(length(N1) != 1 || !is.numeric(N1) || !is.finite(N1) || N1 != round(N1) || N1 <= 0 || N1 >= N)
     stop(paste0("N1 must be a finite and positive integer lower than N =", N), call. = FALSE)
-  if (length(M) != 1 || !is.numeric(M) || !is.finite(M) || M != round(M) || M <= 0)
+  if(length(M) != 1 || !is.numeric(M) || !is.finite(M) || M != round(M) || M <= 0)
     stop("M must be a finite and positive integer", call. = FALSE)
-  if (length(L) != 1 || !is.numeric(L) || !is.finite(L) || L != round(L) || L <= 0)
+  if(length(L) != 1 || !is.numeric(L) || !is.finite(L) || L != round(L) || L <= 0)
     stop("L must be a finite and positive integer", call. = FALSE)
   
   if(length(type_outcome) != 1 || !type_outcome %in% c("continuous", "survival")) # extensions required for binary outcomes
     stop("type_outcome must be 'continuous' or 'survival'", call. = FALSE) 
-  if (length(type_rand) != 1 || !type_rand %in% c("block", "minim")) # extensions required to account for other randomization procedures
+  if(length(type_rand) != 1 || !type_rand %in% c("block", "minim")) # extensions required to account for other randomization procedures
     stop("type_rand must be 'block' or 'minim'", call. = FALSE)
   
   if(type_outcome == "continuous" && type_rand != "block") # extensions required to account for other randomization procedures
@@ -1515,7 +1537,7 @@ simulate_one <- function(type_outcome = "continuous",
        bs < 1)
       stop("bs must be a positive integer", call. = FALSE)
     expected_counts <- bs * probs
-    if (!all(abs(expected_counts - round(expected_counts)) < 1e-3)) {
+    if(!all(abs(expected_counts - round(expected_counts)) < 1e-3)){
       stop("bs must be proportional to the treatment ratio derived by probs.", call. = FALSE)
     }
     if(!is.null(p_min) || !is.null(coefX) || !is.null(probX))
@@ -1527,16 +1549,16 @@ simulate_one <- function(type_outcome = "continuous",
   if(type_outcome == "survival"){
     if(!is.null(alpha))
       stop("If type_outcome = 'survival', alpha must be NULL", call. = FALSE)
-    if (length(Ts) != 1 || !is.numeric(Ts) || !is.finite(Ts) || Ts <= 0)
+    if(length(Ts) != 1 || !is.numeric(Ts) || !is.finite(Ts) || Ts <= 0)
       stop("Ts must be a finite and positive number", call. = FALSE)
-    if (length(Tr) != 1 || !is.numeric(Tr) || !is.finite(Tr) || Tr <= 0 || Tr > Ts)
+    if(length(Tr) != 1 || !is.numeric(Tr) || !is.finite(Tr) || Tr <= 0 || Tr > Ts)
       stop("Tr must be a positive number lower or equal than Ts", call. = FALSE)
-    if (length(adapt_time) != 1 || !is.numeric(adapt_time) || !is.finite(adapt_time) ||
-        adapt_time <= 0 || adapt_time >= Tr)
+    if(length(adapt_time) != 1 || !is.numeric(adapt_time) || !is.finite(adapt_time) ||
+       adapt_time <= 0 || adapt_time >= Tr)
       stop("adapt_time must be a positive number strictly between 0 and Tr", call. = FALSE)
-    if (length(delta) != 1 || !is.numeric(delta) || !is.finite(delta))
+    if(length(delta) != 1 || !is.numeric(delta) || !is.finite(delta))
       stop("delta must be a finite number", call. = FALSE)
-    if (length(lambda0) != 1 || !is.numeric(lambda0) || !is.finite(lambda0) || lambda0 <= 0)
+    if(length(lambda0) != 1 || !is.numeric(lambda0) || !is.finite(lambda0) || lambda0 <= 0)
       stop("lambda0 must be a finite and positive number", call. = FALSE)
   }
   if(type_rand == "minim"){
@@ -1595,12 +1617,12 @@ simulate_one <- function(type_outcome = "continuous",
      any(!is.finite(prevalence)) || any(prevalence < 0) || any(prevalence > 1))
     stop(paste0("prevalence must be a numeric vector of M = ", M,
                 " probabilities"), call. = FALSE)
-  if (abs(sum(prevalence) - 1) > 1e-3)
+  if(abs(sum(prevalence) - 1) > 1e-3)
     stop(paste0("prevalence must sum to 1 (current sum: ", sum(prevalence), ")"),
          call. = FALSE)
   if(length(trt_labels) != 2 || anyNA(trt_labels) || anyDuplicated(trt_labels) > 0)
     stop("trt_labels must contain exactly 2 distinct, non-missing labels", call. = FALSE)
-  if (!isTRUE(all(trt_labels == c(1, 2)))) { # trt_labels transformation
+  if(!isTRUE(all(trt_labels == c(1, 2)))){ # trt_labels transformation
     warning("trt_labels has been transformed to c(1, 2): ",
             trt_labels[1], " -> 1 (control), ",
             trt_labels[2], " -> 2 (experimental)", call. = FALSE)
@@ -1614,8 +1636,8 @@ simulate_one <- function(type_outcome = "continuous",
     stop(paste0("probs must sum to 1 (current sum: ", sum(probs), ")"), call. = FALSE)
   if(!is.numeric(sigma) || length(sigma) != M || any(!is.finite(sigma)))
     stop(paste0("sigma must be a numeric vector of M = ", M, " finite values"), call. = FALSE)
-  if (!is.matrix(tau) || !is.numeric(tau) || nrow(tau) != M || ncol(tau) != M ||
-      any(!is.finite(tau)))
+  if(!is.matrix(tau) || !is.numeric(tau) || nrow(tau) != M || ncol(tau) != M ||
+     any(!is.finite(tau)))
     stop(paste0("tau must be a ", M, "x", M, " numeric matrix with finite entries"),
          call. = FALSE)
   
@@ -1647,7 +1669,7 @@ simulate_one <- function(type_outcome = "continuous",
     F1_hypothesis <- F1_analysis$hypoth
     
     F1_modelWALD <- lm(as.formula(paste("y", F1_formula_str)), data = F1_data_strPBR_dummy)
-    if(any(is.na(coef(F1_modelWALD)))) {
+    if(any(is.na(coef(F1_modelWALD)))){
       F1_S_obsWALD <- NA
       F1_pvaluesWALD <- NA
       F1_rejectsWALD <- NA
@@ -1671,7 +1693,7 @@ simulate_one <- function(type_outcome = "continuous",
     F2_hypothesis <- F2_analysis$hypoth
     
     F2_modelWALD <- lm(as.formula(paste("y", F2_formula_str)), data = F2_data_strPBR_dummy)
-    if(any(is.na(coef(F2_modelWALD)))) {
+    if(any(is.na(coef(F2_modelWALD)))){
       F2_S_obsWALD <- NA
       F2_pvaluesWALD <- NA
       F2_rejectsWALD <- NA
@@ -1695,7 +1717,7 @@ simulate_one <- function(type_outcome = "continuous",
     F3_hypothesis <- F3_analysis$hypoth
     
     F3_modelWALD <- lm(as.formula(paste("y", F3_formula_str)), data = F3_data_strPBR_dummy)
-    if(any(is.na(coef(F3_modelWALD)))) {
+    if(any(is.na(coef(F3_modelWALD)))){
       F3_S_obsWALD <- NA
       F3_pvaluesWALD <- NA
       F3_rejectsWALD <- NA
@@ -1772,7 +1794,7 @@ simulate_one <- function(type_outcome = "continuous",
       )
     }
   }
-  else if (type_outcome=="survival"){
+  else if(type_outcome=="survival"){
     
     # DATA GENERATION
     
@@ -1811,7 +1833,7 @@ simulate_one <- function(type_outcome = "continuous",
     data_tot[[paste0("int", K)]] <- int_ref
     # int_names <- c(int_names, paste0("int", K))
     int_ref_name <- paste0("int", K)
-    for (k in seq_len(K - 1)) {
+    for (k in 1:(K - 1)){
       s_k <- strata_levels[k]
       w_k <- as.numeric(weights[s_k])
       int_k_name <- paste0("int", k)
@@ -1823,10 +1845,14 @@ simulate_one <- function(type_outcome = "continuous",
       z_names <- c(z_names, z_k_name)
     }
     # int_names <- sort(int_names)
-    strat_term <- if (K >= 2) "stratum_assign_f +" else ""
-    z_term <- if (length(z_names) > 0) paste(paste(z_names, collapse = " + "), "+") else ""
-    formule_red <- as.formula(paste("Surv(t_event, event) ~", strat_term, z_term, "covX_f"))
-    formule_full <- as.formula(paste("Surv(t_event, event) ~", strat_term, z_term, "covX_f +", int_ref_name))
+    formule_red <- as.formula(
+      paste("Surv(t_event, event) ~ stratum_assign_f +", 
+            paste(z_names, collapse = " + "), "+ covX_f")
+    )
+    formule_full <- as.formula(
+      paste("Surv(t_event, event) ~ stratum_assign_f +", 
+            paste(z_names, collapse = " + "), "+ covX_f +", int_ref_name)
+    )
     
     conv_issue_asympt <- 0
     na_issue_asympt   <- 0
@@ -1835,9 +1861,10 @@ simulate_one <- function(type_outcome = "continuous",
       tryCatch({
         coxph(formule_red, data = data_tot)
       }, error = function(e) NULL),
-      warning = function(w) {
-        if (grepl("Loglik converged before variable", w$message) ||
-            grepl("coefficient may be infinite", w$message)) {
+      warning = function(w){
+        if(grepl("Loglik converged before variable", w$message) ||
+           grepl("coefficient may be infinite", w$message) ||
+           grepl("did not converge", w$message, fixed = TRUE)){
           conv_issue_asympt <<- 1
           invokeRestart("muffleWarning")
         }
@@ -1845,11 +1872,11 @@ simulate_one <- function(type_outcome = "continuous",
     )
     
     model_full <- NULL
-    if (is.null(model_red)) {
+    if(is.null(model_red) || conv_issue_asympt == 1){
       conv_issue_asympt <- 1                      
-    } else if (anyNA(coef(model_red))) {
+    } else if(anyNA(coef(model_red))){
       na_issue_asympt <- 1                        
-    } else if (conv_issue_asympt == 0) {
+    } else{
       model_full <- tryCatch(
         suppressWarnings(
           coxph(formule_full,
@@ -1859,14 +1886,14 @@ simulate_one <- function(type_outcome = "continuous",
         ),
         error = function(e) NULL
       )
-      if (is.null(model_full)) {
+      if(is.null(model_full)){
         conv_issue_asympt <- 1                   
-      } else if (anyNA(coef(model_full)) || is.na(model_full$score)) {
+      } else if(anyNA(coef(model_full)) || is.na(model_full$score)){
         na_issue_asympt <- 1                    
       }
     }
     
-    if (conv_issue_asympt == 1 || na_issue_asympt == 1) {
+    if(conv_issue_asympt == 1 || na_issue_asympt == 1){
       # Randomization
       if(type_adapt=="EXT"){
         data1$t_eventIA <- NULL
@@ -1929,7 +1956,7 @@ simulate_one <- function(type_outcome = "continuous",
       Nattempts <- NA
     }
     if(type_adapt=="IA"){
-      out_rand <- rand_test_pval_IA(M, data1, data2, keepID, z_c = z_c, drop_trt = drop_trtIA, 
+      out_rand <- rand_test_pval_IA(M, data1, data2, keepID, z_c = z_c, drop_trtIA = drop_trtIA, 
                                     stat_unadj_obs = S_unadj_asympt, stat_adj_obs = S_adj_asympt,
                                     L, max_atts, cov_list = c("stratum_orig","covX"),
                                     trt_labels, probs, p_min)
