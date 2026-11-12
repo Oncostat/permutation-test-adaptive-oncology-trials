@@ -1,4 +1,12 @@
+## R Shiny application developed based on the functions in "simulation_studies.R". 
+## To run the app, please follow these steps:
+## 1. Download the auxiliary file "aux_functions.R" and save it in the same folder as the main .Rshiny file (this is recommended);
+## 2. Open the .Rshiny file in RStudio;
+## 3. Click on the "Run App" button to launch the application.
+
 Sys.setenv(LANG = "en")
+
+# Install and upload packages
 
 # install.packages("shiny")
 # install.packages("bslib")
