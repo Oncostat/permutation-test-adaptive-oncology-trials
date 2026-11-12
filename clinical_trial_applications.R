@@ -3,6 +3,8 @@
 ## algorithm in randomized precision oncology trials" by Marelli et al.
 ## Before running the code, please download the synthetic datasets syn_BREAST.xlsx and syn_LUNG.xlsx.
 
+Sys.setenv(LANG = "en")
+
 ## Install and upload packages and functions 
 
 # install.packages("readxl")
@@ -23,8 +25,6 @@ library(furrr)
 library(tidyverse)
 
 ## User-defined functions
-
-Sys.setenv(LANG = "en")
 
 ## External event:
 ## First randomization of the treatment labels and randomization test statistic calculation:
