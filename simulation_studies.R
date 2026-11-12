@@ -18,6 +18,8 @@
 ## or for other tests (here: unstratified t-test and F-test for continuous outcomes,
 ## and unadjested and adjusted score tests for time-to-event outcomes).
 
+Sys.setenv(LANG = "en")
+
 ## Install and upload packages and functions
 
 # install.packages("car")
@@ -57,7 +59,7 @@ my_strat_block_rand <- function(dataset_torand, trt_seq = c(1,2), prob_each = c(
   if(length(trt_seq) < 2 || anyNA(trt_seq) || anyDuplicated(trt_seq) > 0)
     stop("trt_seq must contain at least 2 distinct, non-missing labels", call. = FALSE)
   if(length(prob_each) != length(trt_seq) || !is.numeric(prob_each) || 
-      any(!is.finite(prob_each)) || any(prob_each < 0) || any(prob_each > 1))
+     any(!is.finite(prob_each)) || any(prob_each < 0) || any(prob_each > 1))
     stop(paste0("prob_each must be a numeric vector of ", length(trt_seq), " probabilities"), 
          call. = FALSE)
   if(abs(sum(prob_each) - 1) > 1e-3)
@@ -125,7 +127,7 @@ my_strat_block_rand <- function(dataset_torand, trt_seq = c(1,2), prob_each = c(
     
     stratum_assign_rslt <- stratum_assign_i_shuffled
     stratum_assign_rslt$block <- paste0("M",stratum_assign_ID[i], "_B", block_assign, 
-                                        "_P", stratum_assign_i_shuffled$stage[i])
+                                        "_P", stratum_assign_i_shuffled$stage[1])
     stratum_assign_rslt$trt <- trt_assign
     
     result_list[[i]] <- stratum_assign_rslt
@@ -153,7 +155,7 @@ my_block_rand <- function(dataset_toorient, strata_seq = c(1,2,3), probs_orient_
   if(length(strata_seq) < 1 || anyNA(strata_seq) || anyDuplicated(strata_seq) > 0)
     stop("strata_seq must contain at least 1 distinct, non-missing label", call. = FALSE)
   if(length(probs_orient_vec) != length(strata_seq) || !is.numeric(probs_orient_vec) || 
-      any(!is.finite(probs_orient_vec)) || any(probs_orient_vec < 0) || any(probs_orient_vec > 1))
+     any(!is.finite(probs_orient_vec)) || any(probs_orient_vec < 0) || any(probs_orient_vec > 1))
     stop(paste0("probs_orient_vec must be a numeric vector of ", length(strata_seq),
                 " probabilities"), call. = FALSE)
   if(abs(sum(probs_orient_vec) - 1) > 1e-3)
@@ -708,7 +710,7 @@ permute_trts_by_block <- function(dataset, seed = NULL){
     stop(paste0("dataset must contain the following columns: ",
                 paste(missing_cols, collapse = ", ")), call. = FALSE)
   if(!is.null(seed) &&
-      (length(seed) != 1 || !is.numeric(seed) || !is.finite(seed) || seed != round(seed)))
+     (length(seed) != 1 || !is.numeric(seed) || !is.finite(seed) || seed != round(seed)))
     stop("seed must be either NULL or a finite integer", call. = FALSE)
   
   
@@ -890,7 +892,7 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
     stop(paste0("dataset2 must contain the following columns: ",
                 paste(missing_cols2, collapse = ", ")), call. = FALSE)
   if(length(drop_trtIA) != 1 || !is.numeric(drop_trtIA) || !is.finite(drop_trtIA) ||
-      drop_trtIA != round(drop_trtIA) || drop_trtIA < 0)
+     drop_trtIA != round(drop_trtIA) || drop_trtIA < 0)
     stop("drop_trtIA must be a non-negative integer", call. = FALSE)
   is_na_or_finite <- function(x)
     length(x) == 1 && (is.na(x) || (is.numeric(x) && is.finite(x)))
@@ -1014,7 +1016,7 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
     pvalue_F1 <- NA
     nulls_F1 <- NA
   }
-  if(!is.null(stat_F2_obs)){
+  if(!is.na(stat_F2_obs)){
     # computation two-sided p-value
     pvalue_F2 <- (1/sum(!is.na(I_F2_L)))*sum(I_F2_L, na.rm = T)
     # numbers of permutations with model convergence issues
@@ -1024,7 +1026,7 @@ perm_test_pval_IA <- function(dataset1, dataset2, z_c, drop_trtIA, stat_F1_obs =
     pvalue_F2 <- NA
     nulls_F2 <- NA
   }
-  if(!is.null(stat_F3_obs)){
+  if(!is.na(stat_F3_obs)){
     # computation two-sided p-value
     pvalue_F3 <- (1/sum(!is.na(I_F3_L)))*sum(I_F3_L, na.rm = T) 
     # numbers of permutations with model convergence issues
@@ -1080,7 +1082,7 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
       stop(sprintf("'%s' must be either NA or a finite number", nm), call. = FALSE)
   }
   if(!is.character(cov_list) || length(cov_list) == 0 || anyNA(cov_list) || 
-      anyDuplicated(cov_list) > 0)
+     anyDuplicated(cov_list) > 0)
     stop("cov_list must be a non-empty character vector without duplicates", call. = FALSE)
   missing_cov <- setdiff(cov_list, colnames(dataset))
   if(length(missing_cov) > 0)
@@ -1177,14 +1179,15 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
         }, error = function(e) NULL),
         warning = function(w){
           if(grepl("Loglik converged before variable", w$message) || 
-              grepl("coefficient may be infinite", w$message)){
+             grepl("coefficient may be infinite", w$message) ||
+             grepl("did not converge", w$message, fixed = TRUE)){
             conv_perm <<- TRUE
             invokeRestart("muffleWarning")
           }
         }
       )
       new_model_full <- NULL
-      if(is.null(new_model_red)){
+      if(is.null(new_model_red) || conv_perm){
         conv_perm <- TRUE                          
       } else if(anyNA(coef(new_model_red))){
         na_perm <- TRUE                          
@@ -1206,10 +1209,10 @@ rand_test_pval_EXT <- function(dataset, keepID, stat_unadj_obs = NA, stat_adj_ob
       }
       
       if(conv_perm){
-          conv_issues_rand <- conv_issues_rand + 1
-        } else if(na_perm){
-          na_issues_rand   <- na_issues_rand + 1
-        }
+        conv_issues_rand <- conv_issues_rand + 1
+      } else if(na_perm){
+        na_issues_rand   <- na_issues_rand + 1
+      }
       
       if(!conv_perm && !na_perm){
         # computation of the test statistic at this iteration
@@ -1272,7 +1275,7 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
     stop(paste0("These keepID values are neither in dataset1 nor in dataset2: ",
                 paste(missing_ID, collapse = ", ")), call. = FALSE)
   if(length(drop_trtIA) != 1 || !is.numeric(drop_trtIA) || !is.finite(drop_trtIA) ||
-      drop_trtIA != round(drop_trtIA) || drop_trtIA < 0)
+     drop_trtIA != round(drop_trtIA) || drop_trtIA < 0)
     stop("drop_trtIA must be a non-negative integer", call. = FALSE)
   is_na_or_finite <- function(x)
     length(x) == 1 && (is.na(x) || (is.numeric(x) && is.finite(x)))
@@ -1281,7 +1284,7 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
       stop(sprintf("'%s' must be either NA or a finite number", nm), call. = FALSE)
   }
   if(!is.character(cov_list) || length(cov_list) == 0 || anyNA(cov_list) || 
-      anyDuplicated(cov_list) > 0)
+     anyDuplicated(cov_list) > 0)
     stop("cov_list must be a non-empty character vector without duplicates", call. = FALSE)
   missing_cov1 <- setdiff(cov_list, colnames(dataset1))
   if(length(missing_cov1) > 0)
@@ -1349,8 +1352,7 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
       new_sub_df <- new_sub_df %>%
         arrange(t0)
       new_sub_df$trt_rand_bin <- new_sub_df$trt_rand - 1
-      new_cox_IA <- coxph(Surv(t_eventIA, eventIA) ~ trt_rand_bin + strata(covX_f), 
-                          data=new_sub_df)
+      new_cox_IA <- coxph(Surv(t_eventIA, eventIA) ~ trt_rand_bin + strata(covX_f), data=new_sub_df)
       new_logHR_IA <- as.numeric(coef(new_cox_IA)["trt_rand_bin"])
       new_SE_logHR_IA <- sqrt(as.numeric(vcov(new_cox_IA)["trt_rand_bin","trt_rand_bin"]))
       new_Zscore_IA[new_s_assign] <- new_logHR_IA / new_SE_logHR_IA
@@ -1453,14 +1455,15 @@ rand_test_pval_IA <- function(M, dataset1, dataset2, keepID, z_c, drop_trtIA, st
           }, error = function(e) NULL),
           warning = function(w){
             if(grepl("Loglik converged before variable", w$message) || 
-                grepl("coefficient may be infinite", w$message)){
+               grepl("coefficient may be infinite", w$message) ||
+               grepl("did not converge", w$message, fixed = TRUE)){
               conv_perm <<- TRUE
               invokeRestart("muffleWarning")
             }
           }
         )
         new_model_full <- NULL
-        if(is.null(new_model_red)){
+        if(is.null(new_model_red) || conv_perm){
           conv_perm <- TRUE                          
         } else if(anyNA(coef(new_model_red))){
           na_perm <- TRUE                          
@@ -1582,7 +1585,7 @@ simulate_one <- function(type_outcome = "continuous",
     if(length(Tr) != 1 || !is.numeric(Tr) || !is.finite(Tr) || Tr <= 0 || Tr > Ts)
       stop("Tr must be a positive number lower or equal than Ts", call. = FALSE)
     if(length(adapt_time) != 1 || !is.numeric(adapt_time) || !is.finite(adapt_time) ||
-        adapt_time <= 0 || adapt_time >= Tr)
+       adapt_time <= 0 || adapt_time >= Tr)
       stop("adapt_time must be a positive number strictly between 0 and Tr", call. = FALSE)
     if(length(delta) != 1 || !is.numeric(delta) || !is.finite(delta))
       stop("delta must be a finite number", call. = FALSE)
@@ -1633,8 +1636,8 @@ simulate_one <- function(type_outcome = "continuous",
   }
   if(stageII_approach == "ORIENT"){
     if(!is.matrix(probs_orient) || !is.numeric(probs_orient) || nrow(probs_orient) != M || 
-        ncol(probs_orient) != M || any(!is.finite(probs_orient)) || any(probs_orient < 0) || 
-        any(probs_orient > 1))
+       ncol(probs_orient) != M || any(!is.finite(probs_orient)) || any(probs_orient < 0) || 
+       any(probs_orient > 1))
       stop(paste0("probs_orient must be a ", M, "x", M," numeric matrix of probabilities"),
            call. = FALSE)
     if(any(diag(probs_orient) != 0))
@@ -1665,7 +1668,7 @@ simulate_one <- function(type_outcome = "continuous",
   if(!is.numeric(sigma) || length(sigma) != M || any(!is.finite(sigma)))
     stop(paste0("sigma must be a numeric vector of M = ", M, " finite values"), call. = FALSE)
   if(!is.matrix(tau) || !is.numeric(tau) || nrow(tau) != M || ncol(tau) != M ||
-      any(!is.finite(tau)))
+     any(!is.finite(tau)))
     stop(paste0("tau must be a ", M, "x", M, " numeric matrix with finite entries"),
          call. = FALSE)
   
@@ -1891,7 +1894,8 @@ simulate_one <- function(type_outcome = "continuous",
       }, error = function(e) NULL),
       warning = function(w){
         if(grepl("Loglik converged before variable", w$message) ||
-            grepl("coefficient may be infinite", w$message)){
+           grepl("coefficient may be infinite", w$message) ||
+           grepl("did not converge", w$message, fixed = TRUE)){
           conv_issue_asympt <<- 1
           invokeRestart("muffleWarning")
         }
@@ -1899,11 +1903,11 @@ simulate_one <- function(type_outcome = "continuous",
     )
     
     model_full <- NULL
-    if(is.null(model_red)){
+    if(is.null(model_red) || conv_issue_asympt == 1){
       conv_issue_asympt <- 1                      
     } else if(anyNA(coef(model_red))){
       na_issue_asympt <- 1                        
-    } else if(conv_issue_asympt == 0){
+    } else{
       model_full <- tryCatch(
         suppressWarnings(
           coxph(formule_full,
@@ -1983,7 +1987,7 @@ simulate_one <- function(type_outcome = "continuous",
       Nattempts <- NA
     }
     if(type_adapt=="IA"){
-      out_rand <- rand_test_pval_IA(M, data1, data2, keepID, z_c = z_c, drop_trt = drop_trtIA, 
+      out_rand <- rand_test_pval_IA(M, data1, data2, keepID, z_c = z_c, drop_trtIA = drop_trtIA, 
                                     stat_unadj_obs = S_unadj_asympt, stat_adj_obs = S_adj_asympt,
                                     L, max_atts, cov_list = c("stratum_orig","covX"),
                                     trt_labels, probs, p_min)
@@ -2013,7 +2017,7 @@ future::availableCores() # check the number of available cores
 plan(multisession, workers = future::availableCores() - 2)
 
 ## Running simulation studies
-seed <- 123
+seed <- 1234
 Ntrials <- 10000
 Nperms <- 1000      
 Natts <- 100000
@@ -2035,20 +2039,21 @@ rslt_cont_EXT_DROP_H0 <- furrr::future_map(1:Ntrials, ~{
                               0,0,0,0,
                               0,0,0,0,
                               0,0,0,0), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = 4, z_c = NULL, 
-               probs_orient = NULL, 
-               L = Nperms, max_atts = NULL) %>%
+               drop_trt = 4, z_c = NULL, probs_orient = NULL, L = Nperms, max_atts = NULL) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_cont_EXT_DROP_H0_df <- list_rbind(rslt_cont_EXT_DROP_H0)
 
 print("Type I errors:")
-print(paste("Naive t-test:", table(rslt_cont_EXT_DROP_H0_df$rejectsNAIVET)["1"]/Ntrials*100, "%"))
-print(paste("Asymptotic F-test:", table(rslt_cont_EXT_DROP_H0_df$F1_rejectsWALD)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in asymptotic:", sum(rslt_cont_EXT_DROP_H0_df$F1_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test:", table(rslt_cont_EXT_DROP_H0_df$F1_rejectsPERM)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in permutations:", sum(rslt_cont_EXT_DROP_H0_df$F1_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_EXT_DROP_H0_df$F1_nullWALD, na.rm = T))*Nperms)*100, "%"))
+print(paste("Naive t-test:", sum(rslt_cont_EXT_DROP_H0_df$rejectsNAIVET == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_DROP_H0_df$rejectsNAIVET))*100, "%"))
+print(paste("Asymptotic F-test:", sum(rslt_cont_EXT_DROP_H0_df$F1_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_DROP_H0_df$F1_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic:", sum(rslt_cont_EXT_DROP_H0_df$F1_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Permutation F-test:", sum(rslt_cont_EXT_DROP_H0_df$F1_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_DROP_H0_df$F1_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations:", sum(rslt_cont_EXT_DROP_H0_df$F1_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_EXT_DROP_H0_df$F1_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
 
 # H1
 rslt_cont_EXT_DROP_H1 <- furrr::future_map(1:Ntrials, ~{
@@ -2064,20 +2069,21 @@ rslt_cont_EXT_DROP_H1 <- furrr::future_map(1:Ntrials, ~{
                               0,0.4,0,0,
                               0,0,0.4,0,
                               0,0,0,0.4), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = 4, z_c = NULL, 
-               probs_orient = NULL, 
-               L = Nperms, max_atts = NULL) %>%
+               drop_trt = 4, z_c = NULL, probs_orient = NULL, L = Nperms, max_atts = NULL) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_cont_EXT_DROP_H1_df <- list_rbind(rslt_cont_EXT_DROP_H1)
 
 print("Statistical powers:")
-print(paste("Naive t-test:", (1-table(rslt_cont_EXT_DROP_H1_df$rejectsNAIVET)["0"]/Ntrials)*100, "%"))
-print(paste("Asymptotic F-test:", (1-table(rslt_cont_EXT_DROP_H1_df$F1_rejectsWALD)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in asymptotic:", sum(rslt_cont_EXT_DROP_H1_df$F1_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test:", (1-table(rslt_cont_EXT_DROP_H1_df$F1_rejectsPERM)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in permutations:", sum(rslt_cont_EXT_DROP_H1_df$F1_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_EXT_DROP_H1_df$F1_nullWALD, na.rm = T))*Nperms)*100, "%"))
+print(paste("Naive t-test:", sum(rslt_cont_EXT_DROP_H1_df$rejectsNAIVET == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_DROP_H1_df$rejectsNAIVET))*100, "%"))
+print(paste("Asymptotic F-test:", sum(rslt_cont_EXT_DROP_H1_df$F1_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_DROP_H1_df$F1_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic:", sum(rslt_cont_EXT_DROP_H1_df$F1_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Permutation F-test:", sum(rslt_cont_EXT_DROP_H1_df$F1_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_DROP_H1_df$F1_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations:", sum(rslt_cont_EXT_DROP_H1_df$F1_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_EXT_DROP_H1_df$F1_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
 
 # Scenario EXT-ORIENT
 # H0
@@ -2105,22 +2111,29 @@ rslt_cont_EXT_ORIENT_H0 <- furrr::future_map(1:Ntrials, ~{
 rslt_cont_EXT_ORIENT_H0_df <- list_rbind(rslt_cont_EXT_ORIENT_H0)
 
 print("Type I errors:")
-print(paste("Naive t-test:", table(rslt_cont_EXT_ORIENT_H0_df$rejectsNAIVET)["1"]/Ntrials*100, "%"))
-print(paste("Asymptotic F-test (F1):", table(rslt_cont_EXT_ORIENT_H0_df$F1_rejectsWALD)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in asymptotic (F1):", sum(rslt_cont_EXT_ORIENT_H0_df$F1_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test (F1):", table(rslt_cont_EXT_ORIENT_H0_df$F1_rejectsPERM)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in permutations (F1):", sum(rslt_cont_EXT_ORIENT_H0_df$F1_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_EXT_ORIENT_H0_df$F1_nullWALD, na.rm = T))*Nperms)*100, "%"))
-print(paste("Asymptotic F-test (F2):", table(rslt_cont_EXT_ORIENT_H0_df$F2_rejectsWALD)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in asymptotic (F2):", sum(rslt_cont_EXT_ORIENT_H0_df$F2_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test (F2):", table(rslt_cont_EXT_ORIENT_H0_df$F2_rejectsPERM)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in permutations (F2):", sum(rslt_cont_EXT_ORIENT_H0_df$F2_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_EXT_ORIENT_H0_df$F2_nullWALD, na.rm = T))*Nperms)*100, "%"))
-print(paste("Asymptotic F-test (F3):", table(rslt_cont_EXT_ORIENT_H0_df$F3_rejectsWALD)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in asymptotic (F3):", sum(rslt_cont_EXT_ORIENT_H0_df$F3_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test (F3):", table(rslt_cont_EXT_ORIENT_H0_df$F3_rejectsPERM)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_EXT_ORIENT_H0_df$F3_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_EXT_ORIENT_H0_df$F3_nullWALD, na.rm = T))*Nperms)*100, "%"))
+print(paste("Naive t-test:", sum(rslt_cont_EXT_ORIENT_H0_df$rejectsNAIVET == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H0_df$rejectsNAIVET))*100, "%"))
+print(paste("Asymptotic F-test (F1):", sum(rslt_cont_EXT_ORIENT_H0_df$F1_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H0_df$F1_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic (F1):", sum(rslt_cont_EXT_ORIENT_H0_df$F1_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Permutation F-test (F1):", sum(rslt_cont_EXT_ORIENT_H0_df$F1_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H0_df$F1_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations (F1):", sum(rslt_cont_EXT_ORIENT_H0_df$F1_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_EXT_ORIENT_H0_df$F1_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
+print(paste("Asymptotic F-test (F2):", sum(rslt_cont_EXT_ORIENT_H0_df$F2_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H0_df$F2_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic (F2):", sum(rslt_cont_EXT_ORIENT_H0_df$F2_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Permutation F-test (F2):", sum(rslt_cont_EXT_ORIENT_H0_df$F2_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H0_df$F2_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations (F2):", sum(rslt_cont_EXT_ORIENT_H0_df$F2_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_EXT_ORIENT_H0_df$F2_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
+print(paste("Asymptotic F-test (F3):", sum(rslt_cont_EXT_ORIENT_H0_df$F3_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H0_df$F3_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic (F3):", sum(rslt_cont_EXT_ORIENT_H0_df$F3_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Permutation F-test (F3):", sum(rslt_cont_EXT_ORIENT_H0_df$F3_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H0_df$F3_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_EXT_ORIENT_H0_df$F3_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_EXT_ORIENT_H0_df$F3_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
 
 # H1
 rslt_cont_EXT_ORIENT_H1 <- furrr::future_map(1:Ntrials, ~{
@@ -2147,22 +2160,29 @@ rslt_cont_EXT_ORIENT_H1 <- furrr::future_map(1:Ntrials, ~{
 rslt_cont_EXT_ORIENT_H1_df <- list_rbind(rslt_cont_EXT_ORIENT_H1)
 
 print("Statistical powers:")
-print(paste("Naive t-test:", (1-table(rslt_cont_EXT_ORIENT_H1_df$rejectsNAIVET)["0"]/Ntrials)*100, "%"))
-print(paste("Asymptotic F-test (F1):", (1-table(rslt_cont_EXT_ORIENT_H1_df$F1_rejectsWALD)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in asymptotic (F1):", sum(rslt_cont_EXT_ORIENT_H1_df$F1_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test (F1):", (1-table(rslt_cont_EXT_ORIENT_H1_df$F1_rejectsPERM)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in permutations (F1):", sum(rslt_cont_EXT_ORIENT_H1_df$F1_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_EXT_ORIENT_H1_df$F1_nullWALD, na.rm = T))*Nperms)*100, "%"))
-print(paste("Asymptotic F-test (F2):", (1-table(rslt_cont_EXT_ORIENT_H1_df$F2_rejectsWALD)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in asymptotic (F2):", sum(rslt_cont_EXT_ORIENT_H1_df$F2_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test (F2):", (1-table(rslt_cont_EXT_ORIENT_H1_df$F2_rejectsPERM)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in permutations (F2):", sum(rslt_cont_EXT_ORIENT_H1_df$F2_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_EXT_ORIENT_H1_df$F2_nullWALD, na.rm = T))*Nperms)*100, "%"))
-print(paste("Asymptotic F-test (F3):", (1-table(rslt_cont_EXT_ORIENT_H1_df$F3_rejectsWALD)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in asymptotic (F3):", sum(rslt_cont_EXT_ORIENT_H1_df$F3_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test (F3):", (1-table(rslt_cont_EXT_ORIENT_H1_df$F3_rejectsPERM)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_EXT_ORIENT_H1_df$F3_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_EXT_ORIENT_H1_df$F3_nullWALD, na.rm = T))*Nperms)*100, "%"))
+print(paste("Naive t-test:", sum(rslt_cont_EXT_ORIENT_H1_df$rejectsNAIVET == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H1_df$rejectsNAIVET))*100, "%"))
+print(paste("Asymptotic F-test (F1):", sum(rslt_cont_EXT_ORIENT_H1_df$F1_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H1_df$F1_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic (F1):", sum(rslt_cont_EXT_ORIENT_H1_df$F1_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Permutation F-test (F1):", sum(rslt_cont_EXT_ORIENT_H1_df$F1_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H1_df$F1_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations (F1):", sum(rslt_cont_EXT_ORIENT_H1_df$F1_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_EXT_ORIENT_H1_df$F1_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
+print(paste("Asymptotic F-test (F2):", sum(rslt_cont_EXT_ORIENT_H1_df$F2_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H1_df$F2_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic (F2):", sum(rslt_cont_EXT_ORIENT_H1_df$F2_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Permutation F-test (F2):", sum(rslt_cont_EXT_ORIENT_H1_df$F2_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H1_df$F2_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations (F2):", sum(rslt_cont_EXT_ORIENT_H1_df$F2_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_EXT_ORIENT_H1_df$F2_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
+print(paste("Asymptotic F-test (F3):", sum(rslt_cont_EXT_ORIENT_H1_df$F3_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H1_df$F3_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic (F3):", sum(rslt_cont_EXT_ORIENT_H1_df$F3_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Permutation F-test (F3):", sum(rslt_cont_EXT_ORIENT_H1_df$F3_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_EXT_ORIENT_H1_df$F3_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_EXT_ORIENT_H1_df$F3_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_EXT_ORIENT_H1_df$F3_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
 
 # Scenario IA-DROP
 # H0
@@ -2179,9 +2199,7 @@ rslt_cont_IA_DROP_H0 <- furrr::future_map(1:Ntrials, ~{
                               0,0,0,0,
                               0,0,0,0,
                               0,0,0,0), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = NULL, z_c = -0.84, 
-               probs_orient = NULL, 
-               L = Nperms, max_atts = Natts) %>%
+               drop_trt = NULL, z_c = -0.84, probs_orient = NULL, L = Nperms, max_atts = Natts) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_cont_IA_DROP_H0_df <- list_rbind(rslt_cont_IA_DROP_H0)
@@ -2190,13 +2208,16 @@ print("Dropping probabilities:")
 print(table(rslt_cont_IA_DROP_H0_df$drop_trtIA)/Ntrials*100)
 
 print("Type I errors:")
-print(paste("Naive t-test:", table(rslt_cont_IA_DROP_H0_df$rejectsNAIVET)["1"]/Ntrials*100, "%"))
-print(paste("Asymptotic F-test:", table(rslt_cont_IA_DROP_H0_df$F1_rejectsWALD)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in asymptotic:", sum(rslt_cont_IA_DROP_H0_df$F1_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Mean number of attempts in permutations:", mean(rslt_cont_IA_DROP_H0_df$Nattempts, na.rm = T)))
-print(paste("Permutation F-test:", table(rslt_cont_IA_DROP_H0_df$F1_rejectsPERM)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in permutations:", sum(rslt_cont_IA_DROP_H0_df$F1_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_IA_DROP_H0_df$F1_nullWALD, na.rm = T))*Nperms)*100, "%"))
+print(paste("Naive t-test:", sum(rslt_cont_IA_DROP_H0_df$rejectsNAIVET == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_DROP_H0_df$rejectsNAIVET))*100, "%"))
+print(paste("Asymptotic F-test:", sum(rslt_cont_IA_DROP_H0_df$F1_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_DROP_H0_df$F1_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic:", sum(rslt_cont_IA_DROP_H0_df$F1_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Mean number of attempts in permutations:", mean(rslt_cont_IA_DROP_H0_df$Nattempts, na.rm = TRUE)))
+print(paste("Permutation F-test:", sum(rslt_cont_IA_DROP_H0_df$F1_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_DROP_H0_df$F1_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations:", sum(rslt_cont_IA_DROP_H0_df$F1_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_IA_DROP_H0_df$F1_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
 
 # H1
 rslt_cont_IA_DROP_H1 <- furrr::future_map(1:Ntrials, ~{
@@ -2212,9 +2233,7 @@ rslt_cont_IA_DROP_H1 <- furrr::future_map(1:Ntrials, ~{
                               0,0.4,0,0,
                               0,0,0.4,0,
                               0,0,0,-0.4), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = NULL, z_c = -0.84, 
-               probs_orient = NULL, 
-               L = Nperms, max_atts = Natts) %>%
+               drop_trt = NULL, z_c = -0.84, probs_orient = NULL, L = Nperms, max_atts = Natts) %>%
     mutate(sim=.x)
 }, .progress = TRUE, .options = furrr_options(seed = seed))
 rslt_cont_IA_DROP_H1_df <- list_rbind(rslt_cont_IA_DROP_H1)
@@ -2223,13 +2242,16 @@ print("Dropping probabilities:")
 print(table(rslt_cont_IA_DROP_H1_df$drop_trtIA)/Ntrials*100)
 
 print("Statistical powers:")
-print(paste("Naive t-test:", (1-table(rslt_cont_IA_DROP_H1_df$rejectsNAIVET)["0"]/Ntrials)*100, "%"))
-print(paste("Asymptotic F-test:", (1-table(rslt_cont_IA_DROP_H1_df$F1_rejectsWALD)["0"]/Ntrials)*100, "%"))
-print(paste("Mean number of attempts in permutations:", mean(rslt_cont_IA_DROP_H1_df$Nattempts, na.rm = T)))
-print(paste("Convergence issues in asymptotic:", sum(rslt_cont_IA_DROP_H1_df$F1_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test:", (1-table(rslt_cont_IA_DROP_H1_df$F1_rejectsPERM)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in permutations:", sum(rslt_cont_IA_DROP_H1_df$F1_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_IA_DROP_H1_df$F1_nullWALD, na.rm = T))*Nperms)*100, "%"))
+print(paste("Naive t-test:", sum(rslt_cont_IA_DROP_H1_df$rejectsNAIVET == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_DROP_H1_df$rejectsNAIVET))*100, "%"))
+print(paste("Asymptotic F-test:", sum(rslt_cont_IA_DROP_H1_df$F1_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_DROP_H1_df$F1_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic:", sum(rslt_cont_IA_DROP_H1_df$F1_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Mean number of attempts in permutations:", mean(rslt_cont_IA_DROP_H1_df$Nattempts, na.rm = TRUE)))
+print(paste("Permutation F-test:", sum(rslt_cont_IA_DROP_H1_df$F1_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_DROP_H1_df$F1_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations:", sum(rslt_cont_IA_DROP_H1_df$F1_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_IA_DROP_H1_df$F1_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
 
 # Scenario IA-ORIENT
 # H0
@@ -2260,23 +2282,30 @@ print("Dropping probabilities:")
 print(table(rslt_cont_IA_ORIENT_H0_df$drop_trtIA)/Ntrials*100)
 
 print("Type I errors:")
-print(paste("Naive t-test:", table(rslt_cont_IA_ORIENT_H0_df$rejectsNAIVET)["1"]/Ntrials*100, "%"))
-print(paste("Asymptotic F-test (F1):", table(rslt_cont_IA_ORIENT_H0_df$F1_rejectsWALD)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in asymptotic (F1):", sum(rslt_cont_IA_ORIENT_H0_df$F1_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Mean number of attempts in permutations:", mean(rslt_cont_IA_ORIENT_H0_df$Nattempts, na.rm = T)))
-print(paste("Permutation F-test (F1):", table(rslt_cont_IA_ORIENT_H0_df$F1_rejectsPERM)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in permutations (F1):", sum(rslt_cont_IA_ORIENT_H0_df$F1_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_IA_ORIENT_H0_df$F1_nullWALD, na.rm = T))*Nperms)*100, "%"))
-print(paste("Asymptotic F-test (F2):", table(rslt_cont_IA_ORIENT_H0_df$F2_rejectsWALD)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in asymptotic (F2):", sum(rslt_cont_IA_ORIENT_H0_df$F2_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test (F2):", table(rslt_cont_IA_ORIENT_H0_df$F2_rejectsPERM)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in permutations (F2):", sum(rslt_cont_IA_ORIENT_H0_df$F2_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_IA_ORIENT_H0_df$F2_nullWALD, na.rm = T))*Nperms)*100, "%"))
-print(paste("Asymptotic F-test (F3):", table(rslt_cont_IA_ORIENT_H0_df$F3_rejectsWALD)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in asymptotic (F3):", sum(rslt_cont_IA_ORIENT_H0_df$F3_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test (F3):", table(rslt_cont_IA_ORIENT_H0_df$F3_rejectsPERM)["1"]/Ntrials*100, "%"))
-print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_IA_ORIENT_H0_df$F3_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_IA_ORIENT_H0_df$F3_nullWALD, na.rm = T))*Nperms)*100, "%"))
+print(paste("Naive t-test:", sum(rslt_cont_IA_ORIENT_H0_df$rejectsNAIVET == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H0_df$rejectsNAIVET))*100, "%"))
+print(paste("Asymptotic F-test (F1):", sum(rslt_cont_IA_ORIENT_H0_df$F1_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H0_df$F1_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic (F1):", sum(rslt_cont_IA_ORIENT_H0_df$F1_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Mean number of attempts in permutations:", mean(rslt_cont_IA_ORIENT_H0_df$Nattempts, na.rm = TRUE)))
+print(paste("Permutation F-test (F1):", sum(rslt_cont_IA_ORIENT_H0_df$F1_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H0_df$F1_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations (F1):", sum(rslt_cont_IA_ORIENT_H0_df$F1_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_IA_ORIENT_H0_df$F1_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
+print(paste("Asymptotic F-test (F2):", sum(rslt_cont_IA_ORIENT_H0_df$F2_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H0_df$F2_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic (F2):", sum(rslt_cont_IA_ORIENT_H0_df$F2_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Permutation F-test (F2):", sum(rslt_cont_IA_ORIENT_H0_df$F2_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H0_df$F2_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations (F2):", sum(rslt_cont_IA_ORIENT_H0_df$F2_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_IA_ORIENT_H0_df$F2_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
+print(paste("Asymptotic F-test (F3):", sum(rslt_cont_IA_ORIENT_H0_df$F3_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H0_df$F3_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic (F3):", sum(rslt_cont_IA_ORIENT_H0_df$F3_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Permutation F-test (F3):", sum(rslt_cont_IA_ORIENT_H0_df$F3_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H0_df$F3_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_IA_ORIENT_H0_df$F3_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_IA_ORIENT_H0_df$F3_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
 
 # H1
 rslt_cont_IA_ORIENT_H1 <- furrr::future_map(1:Ntrials, ~{
@@ -2306,23 +2335,30 @@ print("Dropping probabilities:")
 print(table(rslt_cont_IA_ORIENT_H1_df$drop_trtIA)/Ntrials*100)
 
 print("Statistical powers:")
-print(paste("Naive t-test:", (1-table(rslt_cont_IA_ORIENT_H1_df$rejectsNAIVET)["0"]/Ntrials)*100, "%"))
-print(paste("Asymptotic F-test (F1):", (1-table(rslt_cont_IA_ORIENT_H1_df$F1_rejectsWALD)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in asymptotic (F1):", sum(rslt_cont_IA_ORIENT_H1_df$F1_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Mean number of attempts in permutations:", mean(rslt_cont_IA_ORIENT_H1_df$Nattempts, na.rm = T)))
-print(paste("Permutation F-test (F1):", (1-table(rslt_cont_IA_ORIENT_H1_df$F1_rejectsPERM)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in permutations (F1):", sum(rslt_cont_IA_ORIENT_H1_df$F1_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_IA_ORIENT_H1_df$F1_nullWALD, na.rm = T))*Nperms)*100, "%"))
-print(paste("Asymptotic F-test (F2):", (1-table(rslt_cont_IA_ORIENT_H1_df$F2_rejectsWALD)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in asymptotic (F2):", sum(rslt_cont_IA_ORIENT_H1_df$F2_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test (F2):", (1-table(rslt_cont_IA_ORIENT_H1_df$F2_rejectsPERM)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in permutations (F2):", sum(rslt_cont_IA_ORIENT_H1_df$F2_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_IA_ORIENT_H1_df$F2_nullWALD, na.rm = T))*Nperms)*100, "%"))
-print(paste("Asymptotic F-test (F3):", (1-table(rslt_cont_IA_ORIENT_H1_df$F3_rejectsWALD)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in asymptotic (F3):", sum(rslt_cont_IA_ORIENT_H1_df$F3_nullWALD, na.rm = T)/Ntrials*100, "%"))
-print(paste("Permutation F-test (F3):", (1-table(rslt_cont_IA_ORIENT_H1_df$F3_rejectsPERM)["0"]/Ntrials)*100, "%"))
-print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_IA_ORIENT_H1_df$F3_nullsPERM, na.rm = T)/
-              ((Ntrials-sum(rslt_cont_IA_ORIENT_H1_df$F3_nullWALD, na.rm = T))*Nperms)*100, "%"))
+print(paste("Naive t-test:", sum(rslt_cont_IA_ORIENT_H1_df$rejectsNAIVET == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H1_df$rejectsNAIVET))*100, "%"))
+print(paste("Asymptotic F-test (F1):", sum(rslt_cont_IA_ORIENT_H1_df$F1_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H1_df$F1_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic (F1):", sum(rslt_cont_IA_ORIENT_H1_df$F1_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Mean number of attempts in permutations:", mean(rslt_cont_IA_ORIENT_H1_df$Nattempts, na.rm = TRUE)))
+print(paste("Permutation F-test (F1):", sum(rslt_cont_IA_ORIENT_H1_df$F1_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H1_df$F1_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations (F1):", sum(rslt_cont_IA_ORIENT_H1_df$F1_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_IA_ORIENT_H1_df$F1_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
+print(paste("Asymptotic F-test (F2):", sum(rslt_cont_IA_ORIENT_H1_df$F2_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H1_df$F2_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic (F2):", sum(rslt_cont_IA_ORIENT_H1_df$F2_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Permutation F-test (F2):", sum(rslt_cont_IA_ORIENT_H1_df$F2_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H1_df$F2_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations (F2):", sum(rslt_cont_IA_ORIENT_H1_df$F2_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_IA_ORIENT_H1_df$F2_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
+print(paste("Asymptotic F-test (F3):", sum(rslt_cont_IA_ORIENT_H1_df$F3_rejectsWALD == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H1_df$F3_rejectsWALD))*100, "%"))
+print(paste("Convergence issues in asymptotic (F3):", sum(rslt_cont_IA_ORIENT_H1_df$F3_nullWALD, na.rm = TRUE)/Ntrials*100, "%"))
+print(paste("Permutation F-test (F3):", sum(rslt_cont_IA_ORIENT_H1_df$F3_rejectsPERM == 1, na.rm = TRUE)/
+              sum(!is.na(rslt_cont_IA_ORIENT_H1_df$F3_rejectsPERM))*100, "%"))
+print(paste("Convergence issues in permutations (F3):", sum(rslt_cont_IA_ORIENT_H1_df$F3_nullsPERM, na.rm = TRUE)/
+              ((Ntrials - sum(rslt_cont_IA_ORIENT_H1_df$F3_nullWALD, na.rm = TRUE))*Nperms)*100, "%"))
 
 
 # TIME-TO-EVENT OUTCOMES
@@ -2351,7 +2387,7 @@ rslt_surv_EXT_DROP_H0_df <- list_rbind(rslt_surv_EXT_DROP_H0)
 
 valid_adj <- !(rslt_surv_EXT_DROP_H0_df$conv_issue_asympt == 1 | rslt_surv_EXT_DROP_H0_df$na_issue_asympt == 1)
 n_valid_adj <- sum(valid_adj, na.rm = TRUE)
-      
+
 print("Type I errors:")
 print(paste("Asymptotic unadjusted score test:",
             sum(rslt_surv_EXT_DROP_H0_df$rejects_unadj_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
@@ -2395,7 +2431,7 @@ rslt_surv_EXT_ORIENT_H0_df <- list_rbind(rslt_surv_EXT_ORIENT_H0)
 
 valid_adj <- !(rslt_surv_EXT_ORIENT_H0_df$conv_issue_asympt == 1 | rslt_surv_EXT_ORIENT_H0_df$na_issue_asympt == 1)
 n_valid_adj <- sum(valid_adj, na.rm = TRUE)
-      
+
 print("Type I errors:")
 print(paste("Asymptotic unadjusted score test:",
             sum(rslt_surv_EXT_ORIENT_H0_df$rejects_unadj_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
@@ -2427,7 +2463,7 @@ rslt_surv_IA_DROP_H0 <- furrr::future_map(1:Ntrials, ~{
                               0,0,0,0,
                               0,0,0,0,
                               0,0,0,0), nrow = 4, ncol = 4, byrow = TRUE),
-               drop_trt = NULL, z_c = 0.9, 
+               drop_trt = NULL, z_c = 0.9,
                probs_orient = NULL, 
                L = Nperms, max_atts = Natts) %>%
     mutate(sim=.x)
@@ -2439,7 +2475,7 @@ print(table(rslt_surv_IA_DROP_H0_df$drop_trtIA)/Ntrials*100)
 
 valid_adj <- !(rslt_surv_IA_DROP_H0_df$conv_issue_asympt == 1 | rslt_surv_IA_DROP_H0_df$na_issue_asympt == 1)
 n_valid_adj <- sum(valid_adj, na.rm = TRUE)
-      
+
 print("Type I errors:")
 print(paste("Asymptotic unadjusted score test:",
             sum(rslt_surv_IA_DROP_H0_df$rejects_unadj_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
@@ -2487,7 +2523,7 @@ print(table(rslt_surv_IA_ORIENT_H0_df$drop_trtIA)/Ntrials*100)
 
 valid_adj <- !(rslt_surv_IA_ORIENT_H0_df$conv_issue_asympt == 1 | rslt_surv_IA_ORIENT_H0_df$na_issue_asympt == 1)
 n_valid_adj <- sum(valid_adj, na.rm = TRUE)
-      
+
 print("Type I errors:")
 print(paste("Asymptotic unadjusted score test:",
             sum(rslt_surv_IA_ORIENT_H0_df$rejects_unadj_asympt == 1, na.rm = TRUE)/Ntrials*100, "%"))
