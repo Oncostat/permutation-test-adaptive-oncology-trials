@@ -1,7 +1,7 @@
 # Auxiliary file for "permutation-test-adaptive-oncology-trial" R Shiny application
 
 Sys.setenv(LANG = "en")
-
+ 
 ## User-defined functions
 
 ## Stratified block randomization procedure: stratification within strata and stages.
