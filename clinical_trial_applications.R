@@ -5,7 +5,7 @@
 
 Sys.setenv(LANG = "en")
 
-## Install and upload packages and functions 
+## Install and upload packages
 
 # install.packages("readxl")
 library(readxl)
