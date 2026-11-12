@@ -24,6 +24,8 @@ library(tidyverse)
 
 ## User-defined functions
 
+Sys.setenv(LANG = "en")
+
 ## External event:
 ## First randomization of the treatment labels and randomization test statistic calculation:
 ## the minimization procedure is re-run and the unadjusted or adjusted score test
